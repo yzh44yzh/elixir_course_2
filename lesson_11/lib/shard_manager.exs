@@ -17,7 +17,7 @@ defmodule ShardManager do
 
   def reshard(nodes, num_shards) do
     num_nodes = length(nodes)
-    shards_per_node = div(num_shards, num_nodes)
+    shards_per_node = ceil(num_shards / num_nodes)
     {_, new_state} =
       Enum.reduce(nodes, {0, []},
         fn (node, {from_shard, acc}) ->
