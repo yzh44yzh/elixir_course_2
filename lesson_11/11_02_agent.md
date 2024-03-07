@@ -126,13 +126,13 @@ iex(8)> SM.find_node(300)
 ```elixir-iex
 > r SM
 > nodes = ["Node-1", "Node-2", "Node-3", "Node-4", "Node-5"]
-> SM.reshard(nodes, 48) 
+> SM.reshard(nodes, 48)
 [
-  {36, 44, "Node-5"},
-  {27, 35, "Node-4"},
-  {18, 26, "Node-3"},
-  {9, 17, "Node-2"},
-  {0, 8, "Node-1"}
+  {40, 47, "Node-5"},
+  {30, 39, "Node-4"},
+  {20, 29, "Node-3"},
+  {10, 19, "Node-2"},
+  {0, 9, "Node-1"}
 ]
 > SA.find_node(30)
 {:ok, "Node-4"}
