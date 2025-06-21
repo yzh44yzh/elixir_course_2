@@ -11,3 +11,6 @@ _build
 
 # Emacs
 \#*
+
+# Vim
+*.swp

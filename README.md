@@ -19,76 +19,76 @@
 ## Часть 2. Многопоточность и OTP.
 
 
-### Урок №10. Многопоточность.
+### Урок №01. Многопоточность.
 
-10.01. Работа с процессами на низком уровне.
+01.01. Работа с процессами на низком уровне.
 
-10.02. Почтовый ящик.
+01.02. Почтовый ящик.
 
-10.03. Связь между процессами.
+01.03. Связь между процессами.
 
-10.04. Мониторинг процессов.
+01.04. Мониторинг процессов.
 
-10.05. MapReduce.
-
-
-### Урок №11. Абстракции над процессами: Task, Agent, GenServer.
-
-11.01. Task.
-
-11.02. Agent.
-
-11.03. Создание GenServer.
-
-11.04. Модуль GenServer.
-
-11.05. Использование GenServer.
+01.05. MapReduce.
 
 
-### Урок №12. Supervisor и Application.
+### Урок №02. Абстракции над процессами: Task, Agent, GenServer.
 
-12.01. Supervisor.
+02.01. Task.
 
-12.02. Использование Supervisor.
+02.02. Agent.
 
-12.03. Dynamic Supervisor.
+02.03. Создание GenServer.
 
-12.04. Application.
+02.04. Модуль GenServer.
 
-12.05. Конфигурирование Application.
-
-12.06. Observer.
+02.05. Использование GenServer.
 
 
-### Урок №13. Open Telecom Platform.
+### Урок №03. Supervisor и Application.
 
-13.01. OTP.
+03.01. Supervisor.
 
-13.02. Релиз.
+03.02. Использование Supervisor.
 
-13.03. Модель акторов.
+03.03. Dynamic Supervisor.
 
-13.04. Let It Crash.
+03.04. Application.
 
+03.05. Конфигурирование Application.
 
-### Урок №14. Erlang Term Storage.
-
-14.01. ETS, DETS.
-
-14.02. Mnesia.
-
-14.03. Persistent Term.
+03.06. Observer.
 
 
-### Урок №15. TCP и UDP сокеты.
+### Урок №04. Open Telecom Platform.
 
-15.01. UDP Socket.
+04.01. OTP.
 
-15.02. TCP Socket.
+04.02. Релиз.
 
-15.02. Сервер с Acceptor Pool.
+04.03. Модель акторов.
 
-15.03. Бинарные и текстовые протоколы.
+04.04. Let It Crash.
+
+
+### Урок №05. Erlang Term Storage.
+
+05.01. ETS, DETS.
+
+05.02. Mnesia.
+
+05.03. Persistent Term.
+
+
+### Урок №06. TCP и UDP сокеты.
+
+06.01. UDP Socket.
+
+06.02. TCP Socket.
+
+06.02. Сервер с Acceptor Pool.
+
+06.03. Бинарные и текстовые протоколы.
 
 
 ### Курсовой проект Planning Poker.
