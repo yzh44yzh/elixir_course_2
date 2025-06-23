@@ -1,0 +1,72 @@
+\documentclass[10pt]{beamer}
+
+\usepackage{fontspec}
+\setmainfont{Roboto Mono}[]
+\setsansfont{Roboto Mono}[]
+\setmonofont{Roboto Mono}[]
+
+\usepackage{graphicx}
+\graphicspath{ {../img/} }
+
+\usepackage[absolute,overlay]{textpos} % [showboxes]
+
+\beamertemplatenavigationsymbolsempty
+
+%% \lstset{
+%%   language=ML,
+%%   keywordstyle=\color{blue},
+%%   backgroundcolor=\color{lightgray}
+%% }
+
+\title{Работа с процессами на низком уровне}
+
+\begin{document}
+
+\begin{frame}
+  \frametitle{Многопоточность}
+  \begin{itemize}
+    \item главная фишка BEAM,
+    \item основа масштабируемости, 
+    \item распределённости,
+    \item устойчивости к ошибкам.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Процессы и потоки}
+  Три разные сущности: 
+  \begin{itemize}
+    \item процесс (process), 
+    \item поток (thread) 
+    \item и зеленый поток (green thread).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Процессы BEAM}
+  \begin{itemize}
+    \item имеют свою память (стек и кучу),
+    \item владеют ресурсами (сокетами),
+    \item не блокируют друг друга,
+    \item легковесные.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Процессы BEAM}
+  \begin{itemize}
+    \item стартуют за 3-5 микросекунд,
+    \item занимают 2.5 Кб памяти,
+    \item лимит по умолчанию $2^{18}$ (262 тысячи),
+    \item максимум $2^{27}$ (134 миллиона).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Типичная область применения BEAM}
+  Сервера, которые должны обслуживать большое количество клиентов. 
+  \par \bigskip
+  Особенно если соединения с клиентами являются долгоживущими.
+\end{frame}
+
+\end{document}
