@@ -27,8 +27,8 @@
   \frametitle{Fault Tolerance}
   Устойчивость к ошибкам основана на:
   \begin{itemize}
-    \item связях между процессами: link и monitor,
-    \item системных сообщениях (сигналах),
+    \item связях между процессами: link и monitor;
+    \item системных сообщениях (сигналах);
     \item разделении на системные и рабочие процессы.
   \end{itemize}
 \end{frame}
@@ -59,9 +59,9 @@
 \begin{frame}
   \frametitle{exit reason}
   \begin{itemize}
-    \item normal,
-    \item kill,
-    \item любая другая
+    \item normal;
+    \item kill;
+    \item любая другая.
   \end{itemize}
 \end{frame}
 
@@ -89,4 +89,22 @@
   \includegraphics[scale=0.2]{link_exit_4}
 \end{frame}
 
+\begin{frame}
+  \frametitle{Монитор}
+  \begin{itemize}
+    \item связь односторонняя;
+    \item информация сразу приходит в виде сообщения, а не в виде сигнала;
+    \item получателю не нужно быть системным процессом;
+    \item мониторов может быть несколько, и каждый работает независимо от остальных.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{monitor и spawn\_monitor}
+  \begin{lstlisting}
+  Process.monitor/1
+  Process.demonitor/2
+  Kernel.spawn_monitor/3
+  \end{lstlisting}
+\end{frame}
 \end{document}
