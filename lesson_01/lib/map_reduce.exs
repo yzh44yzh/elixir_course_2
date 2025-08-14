@@ -1,90 +1,84 @@
-defmodule Map_ReduceExample do
+defmodule MapReduce do 
+
   def start() do
-    Map_ReduceExample.Coordinator.start()
+    tree = {:reducer, [
+      {:reducer, [
+        {:mapper, "/home/yury-zhloba/edu/elixir_course_2/lesson_01/01_01_processes.md"},
+        {:mapper, "/home/yury-zhloba/edu/elixir_course_2/lesson_01/01_02_mailbox.md"},
+        {:mapper, "/home/yury-zhloba/edu/elixir_course_2/lesson_01/01_03_link.md"}
+      ]},
+      {:reducer, [
+        {:mapper, "/home/yury-zhloba/edu/elixir_course_2/lesson_01/01_04_monitor.md"},
+        {:mapper, "/home/yury-zhloba/edu/elixir_course_2/lesson_01/01_05_map_reduce.md"}
+      ]}
+    ]}
+    pid = start_process(tree)
+    receive do
+      {:result, pid, result} ->
+        result
+      unknown_msg ->
+        IO.puts("MapReduce #{inspect(self())} got unknown message #{inspect(unknown_msg)}")
+    after
+      1000 -> IO.puts("MapReduce #{inspect(self())} got not messages")
+    end
   end
 
-  defmodule Coordinator do
-    alias Map_ReduceExample.Mapper
-    alias Map_ReduceExample.Reducer
+  def start_process({:reducer, children}) do
+    spawn(MapReduce.Reducer, :run, [self(), children])
+  end
 
-    def start() do
-      processes_tree =
-        {:reducer, :root_reducer,
-         [
-           {:reducer, :r1,
-            [
-              {:mapper, :w1, "./10_01_processes.md"},
-              {:mapper, :w2, "./10_02_mailbox.md"}
-            ]},
-           {:reducer, :r2,
-            [
-              {:mapper, :w3, "./10_03_link.md"},
-              {:mapper, :w4, "./10_04_monitor.md"}
-            ]}
-         ]}
+  def start_process({:mapper, file}) do
+    spawn(MapReduce.Mapper, :run, [self(), file])
+  end
 
-      start(self(), processes_tree)
+  defmodule Reducer do
+    defmodule State do
+      defstruct [:parent, :children, :results]
+    end
 
+    def run(parent, tree_nodes) do
+      IO.puts("Reducer #{inspect(self())} with parent #{inspect(parent)} and #{length(tree_nodes)}")
+      children = Enum.map(tree_nodes, fn(node) -> MapReduce.start_process(node) end)
+      IO.puts("child processes started #{inspect(children)}")
+      state = %State{parent: parent, children: children, results: []}
+      loop(state)
+    end
+
+    def loop(%State{parent: parent, children: [], results: results}) do
+      IO.puts("Reducer #{inspect(self())} got results #{inspect(results)}")
+      result = Enum.sum(results)
+      send(parent, {:result, self(), result})
+    end
+
+    def loop(%State{children: mappers, results: results} = state) do
+      IO.puts("Reducer #{inspect(self())} are in loop with #{length(mappers)} children left")
       receive do
-        {:result, :root_reducer, result} ->
-          {:ok, result}
-
-        msg ->
-          {:error, :unknown_msg, msg}
+        {:result, mapper, result} ->
+          IO.puts("Reducer #{inspect(self())} got result #{result} from #{inspect(mapper)}")
+          state = %State{state |
+            children: List.delete(mappers, mapper),
+            results: [result | results]
+          }
+          loop(state)
+        unknown_msg ->
+          IO.puts("Reducer #{inspect(self())} got unknown message #{inspect(unknown_msg)}")
       after
-        5000 ->
-          {:error, :timeout}
+        1000 -> IO.puts("Reducer #{inspect(self())} got not messages")
       end
-    end
-
-    defp start(parent, {:reducer, id, childs}) do
-      child_ids = Enum.map(childs, fn {_, id, _} -> id end)
-      pid = spawn(Reducer, :start, [parent, id, child_ids])
-      for child <- childs, do: start(pid, child)
-    end
-
-    defp start(parent, {:mapper, id, file}) do
-      spawn(Mapper, :start, [parent, id, file])
     end
   end
 
   defmodule Mapper do
-    def start(parent, id, file) do
-      IO.puts("start mapper '#{id}' with file '#{file}'")
-      result = process(file)
-      send(parent, {:result, id, result})
-    end
+    def run(parent, file) do
+      IO.puts("Mapper #{inspect(self())} with parent #{inspect(parent)} and file #{file}")
+      count = words_cound(file)
+      send(parent, {:result, self(), count})
+    end 
 
-    defp process(file) do
+    def words_cound(file) do
       {:ok, content} = File.read(file)
       String.split(content) |> length()
     end
   end
 
-  defmodule Reducer do
-    def start(parent, id, child_ids) do
-      IO.puts("start reducer '#{id}' with childs #{inspect(child_ids)}")
-      result = wait_for_results(id, child_ids, 0)
-      send(parent, {:result, id, result})
-    end
-
-    defp wait_for_results(_id, [], acc) do
-      acc
-    end
-
-    defp wait_for_results(id, child_ids, acc) do
-      receive do
-        {:result, child_id, result} ->
-          IO.puts("reducer #{id} got result #{result} from #{child_id}")
-          wait_for_results(id, List.delete(child_ids, child_id), acc + result)
-
-        msg ->
-          IO.puts("got unknown msg #{inspect(msg)}")
-          wait_for_results(id, child_ids, acc)
-      after
-        5000 ->
-          IO.puts("reducer #{id} hasn't got all results")
-      end
-    end
-  end
 end
