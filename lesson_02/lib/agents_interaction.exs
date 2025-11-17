@@ -1,16 +1,17 @@
-defmodule Lesson do
-
-  defmodule Session do
-    @type t :: %Session{
-      username: String.t(),
-      num_shard: integer(),
-      node_name: String.t()
-    }
-    
-    defstruct [:username, :num_shard, :node_name]
-  end
+defmodule AgentsInteration do
 
   defmodule SessionManager do
+
+    defmodule Session do
+      @type t :: %Session{
+        username: String.t(),
+        num_shard: integer(),
+        node_name: String.t()
+      }
+      
+      defstruct [:username, :num_shard, :node_name]
+    end
+
     @type state() :: [Session.t()]
 
     @spec add_session(pid(), String.t()) :: :ok

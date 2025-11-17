@@ -15,6 +15,20 @@ defmodule ShardManager do
     Agent.get(:sharding_info, fn(state) -> find_node(state, shard_num) end)
   end
 
+  # function works inside Agent process
+  defp find_node(state, shard_num) do
+    Enum.reduce(state, {:error, :not_found},
+      fn
+        (_, {:ok, res}) -> {:ok, res}
+        ({min_shard, max_shard, node_name}, res) ->
+          if shard_num >= min_shard and shard_num <= max_shard do
+            {:ok, node_name}
+          else
+            res
+          end
+      end)
+  end
+
   def reshard(nodes, num_shards) do
     num_nodes = length(nodes)
     shards_per_node = ceil(num_shards / num_nodes)
@@ -27,20 +41,6 @@ defmodule ShardManager do
         end)
     Agent.update(:sharding_info, fn(_old_state) -> new_state end)
     new_state
-  end
-
-  # it works inside Agent process
-  defp find_node(state, shard_num) do
-    Enum.reduce(state, {:error, :not_found},
-      fn
-        (_, {:ok, res}) -> {:ok, res}
-        ({min_shard, max_shard, node_name}, res) ->
-          if shard_num >= min_shard and shard_num <= max_shard do
-            {:ok, node_name}
-          else
-            res
-          end
-      end)
   end
        
 end
