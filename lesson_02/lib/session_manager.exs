@@ -16,6 +16,7 @@ defmodule SessionManager do
   def add_session(manager_pid, username) do
     shard = 1
     node = "Node-1"
+    # {shard, node} = ShardManager.settle(username)
     session = %Session{username: username, num_shard: shard, node_name: node}
     Agent.update(manager_pid, fn(state) -> [session | state] end)
     :ok

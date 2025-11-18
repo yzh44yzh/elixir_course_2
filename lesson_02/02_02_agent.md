@@ -172,26 +172,45 @@ iex(8)> SM.find_node(300)
 
 Сделаем так, чтобы каждый пользователь был привязан к определенному шарду и узлу.
 
-```elixir
-def add_user(username) do
-  shard = :erlang.phash2(username, 48)
-  {:ok, node} = ShardManager.find_node(shard)
-  Agent.update(:online_users, fn(users) -> [{username, shard, node} | users] end)
-end
-```
+Добавим в ShardManager функцию `settle/1`, которая по имени пользователя определяет, в какой шард и узел он должен быть добавлен:
 
+```elixir
+defmodule ShardManager do
+  ...
+  @spec settle(String.t()) :: {integer(), String.t()}
+  def settle(username) do
+    num_shards = Agent.get(:shard_manager, fn(state) -> state.num_shards end)
+    shard = :erlang.phash2(username, num_shards)
+    {:ok, node} = get_node(shard)
+    {shard, node}
+  end
+```
 Функция `:erlang.phash2/2` позволяет получить хеш от любого значения в виде целого числа в заданом диапазоне. 
+
+И вызовем `settle` в SessionManager:
+```elixir
+defmodule SessionManager do
+  ...
+  @spec add_session(pid(), String.t()) :: :ok
+  def add_session(manager_pid, username) do
+    {shard, node} = ShardManager.settle(username)
+    session = %Session{username: username, num_shard: shard, node_name: node}
+    Agent.update(manager_pid, fn(state) -> [session | state] end)
+    :ok
+  end
+```
 
 Нужно запустить оба агента прежде, чем вызывать их АПИ:
   
 ```elixir
-> c "lib/agents_interation.exs"
+> c "session_manager.exs"
+> c "shard_manager.exs"
 > ShardManager.start
 > SessionManager.start
 > SessionManager.add_user("Helen")
 > SessionManager.add_user("Bob")
 > SessionManager.add_user("Kate")
-> SessionManager.get_users()
+> SessionManager.get_sessions()
 [{"Kate", 17, "Node-2"}, {"Bob", 33, "Node-3"}, {"Helen", 13, "Node-2"}]
 ```
 
