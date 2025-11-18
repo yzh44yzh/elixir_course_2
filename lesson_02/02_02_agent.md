@@ -18,26 +18,26 @@
 
 Мы запускаем Agent и передаём ему функцию, которая должна сформировать начальное состояние. В данном случае это пустой список:
   
-```elixir
+```elixir-iex
 {:ok, agent_pid} = Agent.start(fn () -> [] end)
 ```
 
 Затем мы обновляем состояние агента, передавая ему функцию, которая принимает текущее состояние и возвращает новое. Агент выполняет эту функцию в своём процессе:
 
-```elixir
+```elixir-iex
 Agent.update(agent_pid, fn (online_users) -> ["Bob" | online_users] end)
 Agent.update(agent_pid, fn (online_users) -> ["Kate" | online_users] end)
 ```
 
 Мы можем запросить текущее состояние (или его часть), снова передав агенту функцию, которую он выполнит в своём процессе:
 
-```elixir
+```elixir-iex
 Agent.get(agent_pid, fn (online_users) -> online_users end)
 ```
 
 Обновление списка пользователей удобнее обернуть в некое АПИ:
 
-```elixir
+```elixir-iex
 add_user = fn(name) ->
   Agent.update(agent_pid, fn (online_users) -> [name | online_users] end)
 end
@@ -47,7 +47,7 @@ add_user.("John")
 
 Запрос списка пользователей тоже удобнее обернуть в АПИ:
 
-```elixir
+```elixir-iex
 get_users = fn() ->
   Agent.get(agent_pid, fn (online_users) -> online_users end)
 end
@@ -57,7 +57,7 @@ get_users.()
 
 И дальше с этим можно работать:
 
-```elixir
+```elixir-iex
 add_user.("Helen")
 add_user.("Bill")
 get_users.()
@@ -73,7 +73,7 @@ get_users.()
 
 ### Первый пример -- SessionManager
 
-```elixir
+```elixir-iex
 $ iex session_manager.exs
 iex(1)> pid = SessionManager.start()
 {:ok, #PID<0.118.0>}
@@ -103,7 +103,7 @@ nil
 
 Для этого нам нужно знать, за какой диапазон шард отвечает каждый узел. Эту информацию можно хранить в списке:
 
-```elixir
+```elixir-iex
 [
   { 0, 11, "Node-1"},
   {12, 23, "Node-2"},
@@ -114,32 +114,29 @@ nil
 
 А список мы будем хранить в агенте. Мы помним, что процесс можно зарегистрировать под определенным именем, чтобы обращаться к нему по имени, а не по pid. Агента тоже можно зарегистрировать таким образом.
 
-```elixir
+```elixir-iex
 state = [
-  { 0, 11, "Node-1"},
-  {12, 23, "Node-2"},
-  {24, 35, "Node-3"},
-  {36, 47, "Node-4"}
+  {0, 7, "node-1"},
+  {8, 15, "node-2"},
+  {16, 23, "node-3"},
+  {24, 31, "node-4"}
 ]
-Agent.start(fn () -> state end, [name: :sharding_info])
+Agent.start(fn () -> state end, [name: :shard_manager])
 ```
 
 Обернем агента в модуль, реализуем АПИ для доступа к информации о шардах и посмотрим, как это работает:
 
 ```elixir-iex
-iex(1)> c "lib/shard_manager.exs"
-iex(2)> alias ShardManager, as: SM
-iex(3)> SM.start
+$ iex shard_manager.exs
+iex(1)> ShardManager.start()
 :ok
-iex(4)> SM.find_node(1)
-{:ok, "Node-1"}
-iex(5)> SM.find_node(10)
-{:ok, "Node-1"}
-iex(6)> SM.find_node(12)
-{:ok, "Node-2"}
-iex(7)> SM.find_node(30)
-{:ok, "Node-3"}
-iex(8)> SM.find_node(300)
+iex(2)> ShardManager.get_node(0)
+{:ok, "node-1"}
+iex(3)> ShardManager.get_node(10)
+{:ok, "node-2"}
+iex(4)> ShardManager.get_node(30)
+{:ok, "node-4"}
+iex(5)> ShardManager.get_node(50)
 {:error, :not_found}
 ```
 
@@ -151,18 +148,27 @@ iex(8)> SM.find_node(300)
 Добавим в наш модуль такое АПИ:
 
 ```elixir-iex
-> r SM
-> nodes = ["Node-1", "Node-2", "Node-3", "Node-4", "Node-5"]
-> SM.reshard(nodes, 48)
-[
-  {40, 47, "Node-5"},
-  {30, 39, "Node-4"},
-  {20, 29, "Node-3"},
-  {10, 19, "Node-2"},
-  {0, 9, "Node-1"}
-]
-> SA.find_node(30)
-{:ok, "Node-4"}
+iex(7)> nodes = ["n1", "n2", "n3", "n4", "n5"]
+["n1", "n2", "n3", "n4", "n5"]
+iex(8)> ShardManager.reshard(nodes, 20)
+%{
+  num_shards: 20,
+  shards_ranges: [
+    %ShardManager.ShardsRange{from_shard: 16, to_shard: 19, node: "n5"},
+    %ShardManager.ShardsRange{from_shard: 12, to_shard: 16, node: "n4"},
+    %ShardManager.ShardsRange{from_shard: 8, to_shard: 12, node: "n3"},
+    %ShardManager.ShardsRange{from_shard: 4, to_shard: 8, node: "n2"},
+    %ShardManager.ShardsRange{from_shard: 0, to_shard: 4, node: "n1"}
+  ]
+}
+iex(9)> ShardManager.get_node(0)
+{:ok, "n1"}
+iex(10)> ShardManager.get_node(10)
+{:ok, "n3"}
+iex(11)> ShardManager.get_node(19)
+{:ok, "n5"}
+iex(12)> ShardManager.get_node(20)
+{:error, :not_found}
 ```
 
 
@@ -187,6 +193,16 @@ defmodule ShardManager do
 ```
 Функция `:erlang.phash2/2` позволяет получить хеш от любого значения в виде целого числа в заданом диапазоне. 
 
+```elixir-iex
+$ iex shard_manager.exs
+iex(1)> ShardManager.start
+:ok
+iex(2)> ShardManager.settle("Bob")
+{17, "node-3"}
+iex(3)> ShardManager.settle("Bill")
+{12, "node-2"}
+```
+
 И вызовем `settle` в SessionManager:
 ```elixir
 defmodule SessionManager do
@@ -202,7 +218,7 @@ defmodule SessionManager do
 
 Нужно запустить оба агента прежде, чем вызывать их АПИ:
   
-```elixir
+```elixir-iex
 > c "session_manager.exs"
 > c "shard_manager.exs"
 > ShardManager.start
