@@ -167,7 +167,7 @@ defmodule ShardManager do
   @spec settle(String.t()) :: {integer(), String.t()}
   def settle(username) do
     num_shards = Agent.get(:shard_manager, fn(state) -> state.num_shards end)
-    shard = :erlang.phash2(username, num_shards)
+    shard = :erlang.phash2(username, num_shards) + 1
     {:ok, node} = get_node(shard)
     {shard, node}
   end

@@ -49,22 +49,20 @@ defmodule ShardManager do
   # function works inside Agent process
   @spec get_node(State.t(), non_neg_integer()) :: {:ok, String.t()} | {:error, :not_found}
   defp get_node(state, shard) do
-    Enum.reduce(state.shard_ranges, {:error, :not_found},
-      fn
-        (_, {:ok, node}) -> {:ok, node}
-        (%ShardRange{node: node, from_shard: from_shard, to_shard: to_shard}, acc) ->
-          if shard >= from_shard and shard <= to_shard do
-            {:ok, node}
-          else
-            acc
-          end
+    Enum.filter(state.shard_ranges,
+      fn(%ShardRange{from_shard: from, to_shard: to}) ->
+        shard >= from and shard <= to
       end)
+    |> case do
+      [] -> {:error, :not_found}
+      [%ShardRange{node: node}] -> {:ok, node}
+    end
   end
 
   @spec settle(String.t()) :: {non_neg_integer(), String.t()}
   def settle(username) do
     num_shards = Agent.get(:shard_manager, fn(state) -> state.num_shards end)
-    shard = :erlang.phash2(username, num_shards)
+    shard = :erlang.phash2(username, num_shards) + 1
     {:ok, node} = get_node(shard)
     {shard, node}
   end
