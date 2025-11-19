@@ -1,36 +1,44 @@
 defmodule ShardManager do
 
-  defmodule ShardsRange do
+  defmodule ShardRange do
     @type t :: {
+      node :: String.t(),
       from_shard :: non_neg_integer(), 
-      to_shard :: non_neg_integer(), 
-      node :: String.t()
+      to_shard :: non_neg_integer() 
     }
 
-    defstruct [:from_shard, :to_shard, :node]
+    defstruct [:node, :from_shard, :to_shard]
   end
 
   defmodule State do
     @type t :: %State{
       num_shards: pos_integer(),
-      shards_ranges: [ShardsRange.t()]
+      shard_ranges: [ShardRange.t()]
     }
     
-    defstruct [:num_shards, :shards_ranges]
+    defstruct [:num_shards, :shard_ranges]
   end
 
   def start() do
-    state = %State{
-      num_shards: 32,
-      shards_ranges: [
-        %ShardsRange{from_shard: 0, to_shard: 7, node: "node-1"},
-        %ShardsRange{from_shard: 8, to_shard: 15, node: "node-2"},
-        %ShardsRange{from_shard: 16, to_shard: 23, node: "node-3"},
-        %ShardsRange{from_shard: 24, to_shard: 31, node: "node-4"}
-      ]
-    }
+    nodes = ["node-1", "node-2", "node-3", "node-4"]
+    start(nodes, 32)
+  end
+
+  @spec start([String.t()], pos_integer()) :: State.t()
+  def start(nodes, num_shards) do
+    num_nodes = length(nodes)
+    shards_per_node = ceil(num_shards / num_nodes)
+    {_, shard_ranges} =
+      Enum.reduce(nodes, {1, []},
+        fn (node, {from_shard, acc}) ->
+          to_shard = from_shard + shards_per_node - 1
+          to_shard = if to_shard > num_shards, do: num_shards, else: to_shard
+          range = %ShardRange{node: node, from_shard: from_shard, to_shard: to_shard}
+          {to_shard + 1, [range | acc]}
+        end)
+    state = %{num_shards: num_shards, shard_ranges: shard_ranges}
     Agent.start(fn () -> state end, [name: :shard_manager])
-    :ok
+    state
   end
 
   @spec get_node(non_neg_integer()) :: {:ok, String.t()} | {:error, :not_found}
@@ -41,10 +49,10 @@ defmodule ShardManager do
   # function works inside Agent process
   @spec get_node(State.t(), non_neg_integer()) :: {:ok, String.t()} | {:error, :not_found}
   defp get_node(state, shard) do
-    Enum.reduce(state.shards_ranges, {:error, :not_found},
+    Enum.reduce(state.shard_ranges, {:error, :not_found},
       fn
         (_, {:ok, node}) -> {:ok, node}
-        (%ShardsRange{from_shard: from_shard, to_shard: to_shard, node: node}, acc) ->
+        (%ShardRange{node: node, from_shard: from_shard, to_shard: to_shard}, acc) ->
           if shard >= from_shard and shard <= to_shard do
             {:ok, node}
           else
@@ -59,24 +67,6 @@ defmodule ShardManager do
     shard = :erlang.phash2(username, num_shards)
     {:ok, node} = get_node(shard)
     {shard, node}
-  end
-
-  @spec reshard([String.t()], pos_integer()) :: State.t()
-  def reshard(nodes, num_shards) do
-    num_nodes = length(nodes)
-    shards_per_node = ceil(num_shards / num_nodes)
-    num_shards = num_shards - 1
-    {_, new_shards_ranges} =
-      Enum.reduce(nodes, {0, []},
-        fn (node, {from_shard, acc}) ->
-          to_shard = from_shard + shards_per_node
-          to_shard = if to_shard > num_shards, do: num_shards, else: to_shard
-          range = %ShardsRange{from_shard: from_shard, to_shard: to_shard, node: node}
-          {to_shard, [range | acc]}
-        end)
-    new_state = %{num_shards: num_shards, shards_ranges: new_shards_ranges}
-    Agent.update(:shard_manager, fn(_old_state) -> new_state end)
-    new_state
   end
        
 end

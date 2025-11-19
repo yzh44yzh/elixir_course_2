@@ -99,27 +99,27 @@ nil
 
 ### Второй пример -- ShardManager
 
-Допустим, наш чат-сервер представляет собой кластер из четырех узлов. Мы хотим распределить онлайн пользователей равномерно между узлами и для этого применяем шардинг -- делим всех пользователей на 48 групп (шардов). С помощью некой хеширующей функции мы для каждого пользователя вычисляем, к какому шарду он относится. А затем подключаем пользователя к нужному узлу кластера.
+Допустим, наш чат-сервер представляет собой кластер из четырех узлов. Мы хотим распределить онлайн пользователей равномерно между узлами и для этого применяем шардинг -- делим всех пользователей на 32 группы (шарда). С помощью некой хеширующей функции мы для каждого пользователя вычисляем, к какому шарду он относится. А затем подключаем пользователя к нужному узлу кластера.
 
 Для этого нам нужно знать, за какой диапазон шард отвечает каждый узел. Эту информацию можно хранить в списке:
 
-```elixir-iex
+```elixir
 [
-  { 0, 11, "Node-1"},
-  {12, 23, "Node-2"},
-  {24, 35, "Node-3"},
-  {36, 47, "Node-4"}
+  {"node-1", 1, 9},
+  {"node-2", 10, 23},
+  {"node-3", 24, 35},
+  {"node-4", 36, 47}
 ]
 ```
 
 А список мы будем хранить в агенте. Мы помним, что процесс можно зарегистрировать под определенным именем, чтобы обращаться к нему по имени, а не по pid. Агента тоже можно зарегистрировать таким образом.
 
-```elixir-iex
+```elixir
 state = [
-  {0, 7, "node-1"},
-  {8, 15, "node-2"},
-  {16, 23, "node-3"},
-  {24, 31, "node-4"}
+  {"node-1", 0, 11},
+  {"node-2", 12, 23},
+  {"node-3", 24, 35},
+  {"node-4", 36, 47}
 ]
 Agent.start(fn () -> state end, [name: :shard_manager])
 ```
@@ -129,45 +129,26 @@ Agent.start(fn () -> state end, [name: :shard_manager])
 ```elixir-iex
 $ iex shard_manager.exs
 iex(1)> ShardManager.start()
-:ok
-iex(2)> ShardManager.get_node(0)
-{:ok, "node-1"}
-iex(3)> ShardManager.get_node(10)
-{:ok, "node-2"}
-iex(4)> ShardManager.get_node(30)
-{:ok, "node-4"}
-iex(5)> ShardManager.get_node(50)
-{:error, :not_found}
-```
-
-
-#### Решардинг
-
-Иногда бывает нужно перераспределить шарды между узлами (выполнить решардинг). Обычно это бывает, когда у нас меняется количество узлов в кластере.
-
-Добавим в наш модуль такое АПИ:
-
-```elixir-iex
-iex(7)> nodes = ["n1", "n2", "n3", "n4", "n5"]
-["n1", "n2", "n3", "n4", "n5"]
-iex(8)> ShardManager.reshard(nodes, 20)
 %{
-  num_shards: 20,
-  shards_ranges: [
-    %ShardManager.ShardsRange{from_shard: 16, to_shard: 19, node: "n5"},
-    %ShardManager.ShardsRange{from_shard: 12, to_shard: 16, node: "n4"},
-    %ShardManager.ShardsRange{from_shard: 8, to_shard: 12, node: "n3"},
-    %ShardManager.ShardsRange{from_shard: 4, to_shard: 8, node: "n2"},
-    %ShardManager.ShardsRange{from_shard: 0, to_shard: 4, node: "n1"}
+  num_shards: 32,
+  shard_ranges: [
+    %ShardManager.ShardRange{node: "node-4", from_shard: 25, to_shard: 32},
+    %ShardManager.ShardRange{node: "node-3", from_shard: 17, to_shard: 24},
+    %ShardManager.ShardRange{node: "node-2", from_shard: 9, to_shard: 16},
+    %ShardManager.ShardRange{node: "node-1", from_shard: 1, to_shard: 8}
   ]
 }
-iex(9)> ShardManager.get_node(0)
-{:ok, "n1"}
-iex(10)> ShardManager.get_node(10)
-{:ok, "n3"}
-iex(11)> ShardManager.get_node(19)
-{:ok, "n5"}
-iex(12)> ShardManager.get_node(20)
+iex(2)> ShardManager.get_node(1)
+{:ok, "node-1"}
+iex(3)> ShardManager.get_node(7)
+{:ok, "node-1"}
+iex(4)> ShardManager.get_node(15)
+{:ok, "node-2"}
+iex(5)> ShardManager.get_node(20)
+{:ok, "node-3"}
+iex(6)> ShardManager.get_node(30)
+{:ok, "node-4"}
+iex(7)> ShardManager.get_node(33)
 {:error, :not_found}
 ```
 
@@ -230,4 +211,3 @@ defmodule SessionManager do
 [{"Kate", 17, "Node-2"}, {"Bob", 33, "Node-3"}, {"Helen", 13, "Node-2"}]
 ```
 
-На этом месте опытные разработчики заметят, что если теперь выполнить решардинг, то данные об узлах в списке пользователей станут невалидными. Это верно. Решардинг часто бывает сложной задачей. Это тема для курса "Elixir Expert", а не "Elixir Junior" :)
