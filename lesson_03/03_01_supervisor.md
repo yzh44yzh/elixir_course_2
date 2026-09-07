@@ -29,7 +29,7 @@
   },
   %{
     id: "child_2",
-    start: {Map_Reduce, start, [processes_tree]}
+    start: {MapReduce, start, [processes_tree]}
   },
   %{
     id: "child_3",

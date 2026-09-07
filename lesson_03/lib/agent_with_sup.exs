@@ -1,4 +1,4 @@
-defmodule Lesson_12 do
+defmodule Lesson03 do
 
   defmodule ShardManager do
 

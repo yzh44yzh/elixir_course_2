@@ -1,15 +1,15 @@
-defmodule Lesson_11.Map_Reduce do
+defmodule MapReduce do
 
   def start() do
     processes_tree = 
     {:reducer, [
         {:reducer, [
-            {:mapper, "./11_01_task.md"},
-            {:mapper, "./11_02_agent.md"}
+            {:mapper, "./02_01_task.md"},
+            {:mapper, "./02_02_agent.md"}
           ]},
         {:reducer, [
-            {:mapper, "./11_03_create_gen_server.md"},
-            {:mapper, "./11_04_gen_server_module.md"}
+            {:mapper, "./02_03_create_gen_server.md"},
+            {:mapper, "./02_04_gen_server_module.md"}
           ]}
       ]}
     start(processes_tree)
