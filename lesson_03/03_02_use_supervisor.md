@@ -4,36 +4,42 @@
 
 Возьмем ShardManager из 2-го урока. Его нужно будет немного доработать. 
 
-Во-первых, функцию для запуска процесса общепринято называть `start_link`, и она должна принимать один аргумент. Можно назвать функцию иначе, и аргументов сделать больше, но тогда в супервизоре придется переопределять настройки по-умолчанию, что не всегда удобно.
+Функцию для запуска процесса общепринято называть `start_link`, и она должна принимать один аргумент. Можно назвать функцию иначе, и аргументов сделать больше, но тогда в супервизоре придется переопределять настройки по-умолчанию, что менее удобно.
 
-Во-вторых, мы передадим в эту функцию имя агента и его начальное состояние. Так мы сможем запустить несколько агентов с разными именами и состояниями. А поскольку наша функция принимает один аргумент, то придется передать кортеж:
+Проще передать нужные аргументы в виде кортежа:
 
 ```
-def start_link({agent_name, state}) do
+def start_link({agent_name, nodes, num_shards}) do
+  state = make_state(nodes, num_shards)
   Agent.start(fn () -> state end, [name: agent_name])
 end
 ```
 
-Функцию `find_node` тоже доработаем, чтобы можно было указать имя агента:
+Формирование стейта у нас было прямо внутри функции `start/2`. Вынесем его в отдельную функцию, чтобы не дублировать:
 
 ```
-def find_node(agent_name, shard_num) do
-  Agent.get(agent_name, fn(state) -> do_find_node(state, shard_num) end)
+defp make_state(nodes, num_shards) do
+  ...
+  %{num_shards: num_shards, shard_ranges: shard_ranges}
+end
+``` 
+
+Добавим функцию `find_node`, которая будет отличаться тем, что принимет имя агента. И поэтому она может делать запросы к разным агентам.
+
+```
+def find_node(agent_name, shard) do
+  Agent.get(agent_name, fn(state) -> get_node(state, shard_num) end)
 end
 ```
 
 Запустим одного агента, и будем использовать child specification по-умолчанию:
 
 ```
-def start() do
-  state = [
-    { 0, 11, "Node-1"},
-    {12, 23, "Node-2"},
-    {24, 35, "Node-3"},
-    {36, 47, "Node-4"}
-  ]
+def start_with_sup() do
+  nodes = ["node-1", "node-2", "node-3", "node-4"]
+
   child_spec = [
-    {ShardManager, {:agent_1, state}}
+    {ShardManager, {:agent_1, nodes, 32}}
   ]
   Supervisor.start_link(child_spec, strategy: :one_for_all)
 end
@@ -53,16 +59,6 @@ use Agent
 
 Это специальный макрос, который неявно добавляет в модуль функцию `child_spec/1`. Супервизор вызывает эту функцию и получает child specification непосредственно от модуля, который он собирается запускать.
 
-```
-> c "lib/agent_with_sup.exs"
-
-> Lesson_12.ShardManager.child_spec(:no_args)
-%{
-  id: Lesson_12.ShardManager,
-  start: {Lesson_12.ShardManager, :start_link, [:no_args]}
-}
-```
-
 В Эликсире (в отличие от Эрланга) принято соглашение, что каждый модуль сам определяет child specification, необходимый для его запуска. Для Task, Agent и GenServer это генерируется неявно со значениями по умолчанию.
 
 Если мы захотим что-то переопределить, что достаточно передать нужные ключи в макрос:
@@ -71,33 +67,30 @@ use Agent
 use Agent, restart: :permanent
 ```
 
-и макрос сгенерирует нужную реализацию:
-
-```
-> Lesson_12.ShardManager.child_spec(:no_args)
-%{
-  id: Lesson_12.ShardManager,
-  restart: :permanent,
-  start: {Lesson_12.ShardManager, :start_link, [:no_args]}
-}
-```
+и макрос сгенерирует нужную реализацию.
 
 Запускаем и смотрим, как это работает:
 
 ```
-iex(9)> Lesson_12.start()
-{:ok, #PID<0.167.0>}
+$ iex shard_manager.exs
 
-iex(10)> Lesson_12.ShardManager.find_node(:agent_1, 0)
-{:ok, "Node-1"}
-iex(12)> Lesson_12.ShardManager.find_node(:agent_1, 10)
-{:ok, "Node-1"}
-iex(13)> Lesson_12.ShardManager.find_node(:agent_1, 15) 
-{:ok, "Node-2"}
-iex(14)> Lesson_12.ShardManager.find_node(:agent_1, 40)
-{:ok, "Node-4"}
-iex(15)> Lesson_12.ShardManager.find_node(:agent_1, 60)
+> ShardManager.child_spec(:no_arg)
+%{
+  id: ShardManager,
+  restart: :permanent,
+  start: {ShardManager, :start_link, [:no_arg]}
+}
+
+> ShardManager.start_with_sup
+{:ok, #PID<0.121.0>}
+> ShardManager.find_node(:agent_1, 1)
+{:ok, "node-1"}
+> ShardManager.find_node(:agent_1, 5)
+{:ok, "node-1"}
+> ShardManager.find_node(:agent_1, 50)
 {:error, :not_found}
+> ShardManager.find_node(:agent_1, 30)
+{:ok, "node-4"}
 ```
 
 ## Запускаем двух агентов
