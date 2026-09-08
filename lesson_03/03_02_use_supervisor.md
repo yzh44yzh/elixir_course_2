@@ -100,45 +100,44 @@ $ iex shard_manager.exs
 Но мы не можем запустить двух агентов с одинаковым id, поэтому придется явно указать child specification:
 
 ```
-def start_2_agents() do
-  state_1 = [
-      {0, 4, "Node-1"},
-      {5, 9, "Node-2"}
-  ]
-  state_2 = [
-      { 0,  9, "Node-1"},
-      {10, 19, "Node-2"},
-      {20, 29, "Node-3"}
-  ]
-
-  child_spec = [
-    %{
-      id: :agent_a,
-      start: {ShardManager, :start_link, [{:agent_a, state_1}]}
-    },
-    %{
-      id: :agent_b,
-      start: {ShardManager, :start_link, [{:agent_b, state_2}]}
-    }
-  ]
-  Supervisor.start_link(child_spec, strategy: :one_for_all)
-end
-
+  def start_2_agents() do
+    nodes_1 = ["node-a1", "node-a2", "node-a3", "node-a4"]
+    nodes_2 = ["node-b1", "node-b2", "node-b3", "node-b4"]
+    child_spec = [
+      %{
+        id: :agent_a,
+        start: {ShardManager, :start_link, [{:agent_a, nodes_1, 10}]}
+      },
+      %{
+        id: :agent_b,
+        start: {ShardManager, :start_link, [{:agent_b, nodes_2, 16}]}
+      }
+    ]
+    Supervisor.start_link(child_spec, strategy: :one_for_all)
+  end
 ```
 
 Смотрим, как это работает:
 
 ```
-iex(6)> Lesson_12.start_2_agents()
-{:ok, #PID<0.125.0>}
-iex(7)> Lesson_12.ShardManager.find_node(:agent_a, 5)
-{:ok, "Node-2"}
-iex(8)> Lesson_12.ShardManager.find_node(:agent_b, 5)
-{:ok, "Node-1"}
-iex(9)> Lesson_12.ShardManager.find_node(:agent_a, 10)
+> ShardManager.start_2_agents
+{:ok, #PID<0.121.0>}
+> ShardManager.find_node(:agent_a, 1)
+{:ok, "node-a1"}
+> ShardManager.find_node(:agent_a, 5)
+{:ok, "node-a2"}
+> ShardManager.find_node(:agent_a, 10)
+{:ok, "node-a4"}
+> ShardManager.find_node(:agent_a, 11)
 {:error, :not_found}
-iex(10)> Lesson_12.ShardManager.find_node(:agent_b, 10)
-{:ok, "Node-2"}
+> ShardManager.find_node(:agent_b, 1)
+{:ok, "node-b1"}
+> ShardManager.find_node(:agent_b, 5)
+{:ok, "node-b2"}
+> ShardManager.find_node(:agent_b, 10)
+{:ok, "node-b3"}
+> ShardManager.find_node(:agent_b, 11)
+{:ok, "node-b3"}
 ```
 
 (В Эрланг такого рода макросов нет, и все child specification всегда нужно явно прописывать. Впрочем, многие считают это преимуществом исходя из принципа "явное лучше неявного").
@@ -151,27 +150,25 @@ iex(10)> Lesson_12.ShardManager.find_node(:agent_b, 10)
 Так что нам достаточно вместо:
 
 ```
-Task.async(__MODULE__, :find_elixir_sources, [path])
+result_stream = Task.async_stream(children, &map_reduce/1)
 ```
 
 сделать
 
 ```
 {:ok, sup_pid} = Task.Supervisor.start_link()
-Task.Supervisor.async(sup_pid, __MODULE__, :find_elixir_sources, [path])
+result_stream = Task.Supervisor.async_stream(sup_pid, children, &map_reduce/1)
 ```
+
+(и ещё поправить пути к файлам)
 
 и все работает:
 
 ```
-iex(1)> c "lib/task_with_sup.exs"
-[Lesson_12, Lesson_12.FindSourcesTask]
-iex(2)> task = Lesson_12.FindSourcesTask.start("lib")
-iex(3)> Lesson_12.FindSourcesTask.get_result(task)
-["lib/task_with_sup.exs", "lib/agent_with_sup.exs"]
-iex(4)> task = Lesson_12.FindSourcesTask.start("../lesson_11/lib")
-iex(5)> Lesson_12.FindSourcesTask.get_result(task)
-["../lesson_11/lib/path_finder2.exs", "../lesson_11/lib/path_finder.exs"]
+$ iex map_reduce_with_sup.exs
+> MapReduce.start
+...
+3601
 ```
 
 Task можно запустить под обычным супервизором так же, как мы выше запускали Agent:

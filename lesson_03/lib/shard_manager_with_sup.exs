@@ -29,6 +29,22 @@ defmodule ShardManager do
     Supervisor.start_link(child_spec, strategy: :one_for_all)
   end
 
+  def start_2_agents() do
+    nodes_1 = ["node-a1", "node-a2", "node-a3", "node-a4"]
+    nodes_2 = ["node-b1", "node-b2", "node-b3", "node-b4"]
+    child_spec = [
+      %{
+        id: :agent_a,
+        start: {ShardManager, :start_link, [{:agent_a, nodes_1, 10}]}
+      },
+      %{
+        id: :agent_b,
+        start: {ShardManager, :start_link, [{:agent_b, nodes_2, 16}]}
+      }
+    ]
+    Supervisor.start_link(child_spec, strategy: :one_for_all)
+  end
+
   def start_link({agent_name, nodes, num_shards}) do
     state = make_state(nodes, num_shards)
     Agent.start(fn () -> state end, [name: agent_name])
