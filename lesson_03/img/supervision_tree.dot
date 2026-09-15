@@ -5,11 +5,14 @@ digraph GS {
 
     RootSup [fillcolor=gold2];
     AgentSup [fillcolor=gold2];
+    PathFinderSup [fillcolor=gold2];
     
     edge [color=blue, arrowsize=1.6];
     "iex shell" -> RootSup;
-    RootSup -> PathFinder;
     RootSup -> AgentSup;
+    RootSup -> PathFinderSup;
     AgentSup -> agent_1;
     AgentSup -> agent_2;
+    PathFinderSup -> pf_ru;
+    PathFinderSup -> pf_eu;
 }

@@ -188,16 +188,12 @@ Supervisor.start_link(child_spec, strategy: :one_for_all)
 Запустим PathFinder из прошлого урока. Поскольку там есть `use GenServer`, то и функция `child_spec/1` тоже есть:
 
 ```
-iex(1)> c "lib/gen_server_with_sup.exs"
-[Lesson_12, Lesson_12.PathFinder]
-iex(2)> Lesson_12.PathFinder.child_spec(:no_args)
-%{
-  id: Lesson_12.PathFinder,
-  start: {Lesson_12.PathFinder, :start_link, [:no_args]}
-}
+> c "lib/path_finder_with_sup.exs"
+> PathFinder.child_spec(:no_args)
+%{id: PathFinder, start: {PathFinder, :start_link, [:no_args]}}
 ```
 
-Запуск сервера нужно немного поправить, вместо:
+Запуск сервера нужно поправить, вместо:
 
 ```
 def start() do
@@ -205,20 +201,27 @@ def start() do
 end
 ```
 
-сделаем:
+сделаем функцию `start_link`, которая принимает имя сервера и путь к файлу с данными. Это позволит запустить несколько таких серверов с разными данными (чем мы воспользуемся позже):
 
 ```
-def start_link(_) do
-  GenServer.start_link(__MODULE__, :no_args, [name: @server_name])
+def start_link(name, cities_file) do
+  GenServer.start_link(__MODULE__, cities_file, [name: name])
+end
+```
+
+Путь к файлу нужно будет сохранить в стейте и использовать в отложенной инициализации:
+```
+def init(cities_file) do
+  state = %{
+    cities_file: cities_file
+  }
+  {:ok, state, {:continue, :delayed_init}}
 end
 
-```
-чтобы соответствовать child spec, чтобы дочерний процесс линковался с супервизором.
-
-Поправим путь к данным: 
-
-```
-@cities_file "../lesson_11/data/cities.csv"
+def handle_continue(:delayed_init, state) do
+  ...
+  data = load_data(state.cities_file)
+  ...
 ```
 
 Добавим запуск через супервизор:
@@ -226,85 +229,189 @@ end
 ```
 def start() do
   children = [
-    {__MODULE__, [:no_args]}
+    %{
+      id: @server_name,
+      start: {__MODULE__, :start_link, [@server_name, "./data/cities_ru.csv"]}
+    },
   ]
   Supervisor.start_link(children, strategy: :one_for_all)
 end
-
 ```
+
 Запускаем и проверяем:
-```
 
-iex(6)> Lesson_12.PathFinder.start()
+```
+> PathFinder.start()
 {:ok, #PID<0.163.0>}
-iex(7)> Lesson_12.PathFinder.get_route("Москва", "Владивосток")
-{:error, :no_route}
-iex(9)> Lesson_12.PathFinder.get_route("Москва", "Астрахань")
-{:ok, ["Москва", "Мурманск", "Астрахань"], 5469}
+> PathFinder.get_route("Москва", "Брянск")
+{:ok, ["Москва", "Брянск"], 364}
+> PathFinder.get_route("Иркутск", "Тюмень")
+{:ok, ["Иркутск", "Казань", "Брянск", "Тюмень"], 7921}
 ```
 
-## Супервизор как отдельный модуль
+И если мы хотим запускать несколько PathFinder, то нужен отдельный `get_route` где можно указать, на каком PathFinder его вызывать:
 
-Нам еще нужно научиться запускать супервизор под супервизором. Для этого дочерний супервизор должен быть представлен модулем. 
+```
+def get_route(name, city1, city2) do
+  GenServer.call(name, {:get_route, city1, city2})
+end
 
-Как и для GenServer, существует Supervisor behaviour, который нужно реализовать в этом модуле. behaviour требует наличия только одной функции -- `init/1`.
+> PathFinder.get_route(PathFinder, "Иркутск", "Тюмень")
+{:ok, ["Иркутск", "Казань", "Брянск", "Тюмень"], 7921}
+```
 
-Запуск Supervisor похож на запуск GenServer. Вот картинка, аналогичная той, что мы видели в 10-м уроке:
-![Supervisor Init](./img/supervisor_init.png)
 
-Напомню, что два левых квадрата (верхний и нижний), соответствуют нашему модулю.  Два правых квадрата соответствуют коду OTP. Два верхних квадрата выполняются в процессе родителя, два нижних квадрата выполняются в дочернем процессе.
+## Дерево супервизоров
+
+Нам еще нужно научиться запускать супервизор под супервизором. И тогда мы можем построить дерево из супервизоров и рабочих процессов.
+
+Дочерний супервизор должен быть представлен отдельны модулем, чтобы было что запускать. Как и для GenServer, существует Supervisor behaviour, который нужно реализовать в этом модуле. behaviour требует наличия только одной функции -- `init/1`.
+
+Создадим супервизор, который запускает два ShardManager:
+```
+  defmodule AgentSup do
+    use Supervisor
+
+    def start_link(_) do
+      IO.puts("AgentSup.start_link #{inspect self()}")
+      Supervisor.start_link(__MODULE__, :no_args)
+    end
+    
+    @impl true
+    def init(_) do
+      IO.puts("AgentSup.init #{inspect self()}")
+      ...
+    end
+  end
+```
 
 Начинаем с функции `start_link/0`:
 
 ```
-def start_link(args) do
-  Supervisor.start_link(__MODULE__, args, name: __MODULE__)
+def start_link(_) do
+  Supervisor.start_link(__MODULE__, :no_args)
 end
 ```
 
 Здесь мы просим Supervisor запустить новый процесс для дочернего супервизора. Новый процесс входит в `loop` и вызывает callback `init/1`.
 
-```
-@impl true
-def init(_args) do
-  children = [
-    {Lesson_12.AgentSup, [:no_args]},
-    {Lesson_12.PathFinder, [:no_args]}
-  ]
-  Supervisor.init(children, strategy: :one_for_all) 
-end
-```
-
-Внутри init декларируются дочерние процессы и вызывается `Supervisor.init`. Это отличается от того, что мы делали раньше -- вызывали Supervisor.start_link.
-
-Мы реализуем модуль AgentSup, который будет супервизором для двух агентов, и модуль RootSup, который будет супервизором для PathFinder и для AgentSup. 
-
-Подключим макрос `use Supervisor`, что даст реализацию `child_spec` по умолчанию.
+Внутри init декларируются дочерние процессы и вызывается `Supervisor.init`: 
 
 ```
-c "lib/agent_with_sup.exs"
-c "lib/gen_server_with_sup.exs"
-c "lib/sup.exs"
+  defmodule AgentSup do
+    
+    @impl true
+    def init(_) do
+      IO.puts("AgentSup.init #{inspect self()}")
 
-iex(13)> Lesson_12.RootSup.child_spec(:no_args)
-%{
-  id: Lesson_12.RootSup,
-  start: {Lesson_12.RootSup, :start_link, [:no_args]},
-  type: :supervisor
-}
-iex(14)> Lesson_12.AgentSup.child_spec(:no_args)
-%{
-  id: Lesson_12.AgentSup,
-  start: {Lesson_12.AgentSup, :start_link, [:no_args]},
-  type: :supervisor
-}
+      nodes_1 = ["node-a1", "node-a2", "node-a3", "node-a4"]
+      nodes_2 = ["node-b1", "node-b2", "node-b3", "node-b4"]
+      child_spec = [
+        %{
+          id: :agent_a,
+          start: {ShardManager, :start_link, [{:agent_a, nodes_1, 10}]}
+        },
+        %{
+          id: :agent_b,
+          start: {ShardManager, :start_link, [{:agent_b, nodes_2, 16}]}
+        }
+      ]
+      Supervisor.init(child_spec, strategy: :one_for_all)
+    end
+  end
+```
 
-Lesson_12.MyApp.start_sup_tree()
+Аналогично реализуем PathFinderSup, который запускает два PathFinder:
 
-Lesson_12.ShardManager.find_node(:agent_a, 5)
-Lesson_12.ShardManager.find_node(:agent_b, 5)
-Lesson_12.PathFinder.get_route("Москва", "Владивосток")
-Lesson_12.PathFinder.get_route("Москва", "Астрахань")
+```
+  defmodule PathFinderSup do
+    use Supervisor
+
+    def start_link(_) do
+      IO.puts("PathFinderSup.start_link #{inspect self()}")
+      Supervisor.start_link(__MODULE__, :no_args)
+    end
+    
+    @impl true
+    def init(_) do
+      IO.puts("PathFinderSup.init #{inspect self()}")
+      child_spec = [
+        %{
+          id: :pf_ru,
+          start: {PathFinder, :start_link, [:pf_ru, "./data/cities_ru.csv"]}
+        },
+        %{
+          id: :pf_eu,
+          start: {PathFinder, :start_link, [:pf_eu, "./data/cities_eu.csv"]}
+        }
+      ]
+      Supervisor.init(child_spec, strategy: :one_for_all)
+    end
+  end
+```
+
+Теперь создадим корневой супервизор, который запускает два дочерних супервизора:
+
+```
+  defmodule RootSup do
+    use Supervisor
+
+    def start_link(_) do
+      IO.puts("RootSup.start_link #{inspect self()}")
+      Supervisor.start_link(__MODULE__, :no_args)
+    end
+    
+    @impl true
+    def init(_) do
+      IO.puts("RootSup.init #{inspect self()}")
+      child_spec = [
+        App.AgentSup,
+        App.PathFinderSup
+      ]
+      Supervisor.init(child_spec, strategy: :one_for_all)
+    end
+  end
+```
+
+И запустим корневой супервизор:
+
+```
+defmodule App do
+
+  def start() do
+    IO.puts("App.start #{inspect self()}")
+    App.RootSup.start_link(:no_args)
+  end
+```
+
+Теперь всё это соберём и запустим:
+
+```
+> c "lib/shard_manager_with_sup.exs"
+> c "lib/path_finder_with_sup.exs"
+> c "lib/sup_tree.exs"
+
+> App.start()
+App.start #PID<0.109.0>
+RootSup.start_link #PID<0.109.0>
+RootSup.init #PID<0.146.0>
+AgentSup.start_link #PID<0.146.0>
+AgentSup.init #PID<0.147.0>
+PathFinderSup.start_link #PID<0.146.0>
+PathFinderSup.init #PID<0.150.0>
+{:ok, #PID<0.146.0>}
+
+> ShardManager.find_node(:agent_a, 5)
+{:ok, "node-a2"}
+> ShardManager.find_node(:agent_b, 5)
+{:ok, "node-b2"}
+
+> PathFinder.get_route(:pf_ru, "Иркутск", "Тюмень")
+{:ok, ["Иркутск", "Казань", "Брянск", "Тюмень"], 7921}
+> PathFinder.get_route(:pf_ru, "Barcelona", "Vienna")
+{:error, :no_route}
+> PathFinder.get_route(:pf_eu, "Barcelona", "Vienna")
+{:ok, ["Barcelona", "Vienna"], 1989}
 ```
 
 Таким образом у нас получилось дерево процессов:

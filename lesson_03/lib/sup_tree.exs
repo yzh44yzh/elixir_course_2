@@ -35,26 +35,19 @@ defmodule App do
     @impl true
     def init(_) do
       IO.puts("AgentSup.init #{inspect self()}")
-      state_a = [
-        { 0, 11, "Node-1"},
-        {12, 23, "Node-2"},
-        {24, 35, "Node-3"},
-        {36, 47, "Node-4"}
-      ]
-      state_b = [
-        { 0, 7, "NodeA"},
-        {8, 15, "NodeB"}
-      ]
+
+      nodes_1 = ["node-a1", "node-a2", "node-a3", "node-a4"]
+      nodes_2 = ["node-b1", "node-b2", "node-b3", "node-b4"]
       child_spec = [
         %{
           id: :agent_a,
-          start: {Lesson_12.ShardingAgent, :start_link, [{:agent_a, state_a}]}
+          start: {ShardManager, :start_link, [{:agent_a, nodes_1, 10}]}
         },
         %{
           id: :agent_b,
-          start: {Lesson_12.ShardingAgent, :start_link, [{:agent_b, state_b}]}
+          start: {ShardManager, :start_link, [{:agent_b, nodes_2, 16}]}
         }
-      ]      
+      ]
       Supervisor.init(child_spec, strategy: :one_for_all)
     end
   end
@@ -73,16 +66,15 @@ defmodule App do
       child_spec = [
         %{
           id: :pf_ru,
-          start: {PathFinder, :start_link, [{:pf_ru, "./cities.csv"}]}
+          start: {PathFinder, :start_link, [:pf_ru, "./data/cities_ru.csv"]}
         },
         %{
           id: :pf_eu,
-          start: {PathFinder, :start_link, [{:pf_eu, "./cities_eu.csv"}]}
+          start: {PathFinder, :start_link, [:pf_eu, "./data/cities_eu.csv"]}
         }
       ]
       Supervisor.init(child_spec, strategy: :one_for_all)
     end
   end
-
   
 end
