@@ -13,7 +13,7 @@
 ## Часть 2. Многопоточность и OTP.
 
 
-### Урок №01. Многопоточность.
+### Тема №01. Многопоточность.
 
 01.01. Работа с процессами на низком уровне.
 
@@ -26,7 +26,7 @@
 01.05. MapReduce.
 
 
-### Урок №02. Абстракции над процессами: Task, Agent, GenServer.
+### Тема №02. Абстракции над процессами: Task, Agent, GenServer.
 
 02.01. Task.
 
@@ -39,7 +39,7 @@
 02.05. Использование GenServer.
 
 
-### Урок №03. Supervisor и Application.
+### Тема №03. Supervisor и Application.
 
 03.01. Supervisor.
 
@@ -52,7 +52,7 @@
 03.05. Observer.
 
 
-### Урок №04. Open Telecom Platform.
+### Тема №04. Open Telecom Platform.
 
 04.01. OTP.
 
@@ -63,7 +63,7 @@
 04.04. Let It Crash.
 
 
-### Урок №05. TCP и UDP сокеты.
+### Тема №05. TCP и UDP сокеты.
 
 05.01. UDP Socket.
 
@@ -74,7 +74,7 @@
 05.04. Бинарные и текстовые протоколы.
 
 
-### Урок №06, дополнительный. In-memory Storages.
+### Тема №06. In-memory Storages.
 
 06.01. ETS, DETS.
 
