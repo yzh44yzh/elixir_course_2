@@ -20,7 +20,7 @@
 
 ## Реализация ClientSession
 
-[[./lib/chat_server.exs]]
+[./lib/chat_server.exs]
 
 Важные нюансы: 
 - `restart: :transient`

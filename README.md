@@ -43,15 +43,13 @@
 
 03.01. Supervisor.
 
-03.02. Использование Supervisor.
+03.02. Dynamic Supervisor.
 
-03.03. Dynamic Supervisor.
+03.03. Application.
 
-03.04. Application.
+03.04. Конфигурирование Application.
 
-03.05. Конфигурирование Application.
-
-03.06. Observer.
+03.05. Observer.
 
 
 ### Урок №04. Open Telecom Platform.
@@ -65,24 +63,23 @@
 04.04. Let It Crash.
 
 
-### Урок №05. Erlang Term Storage.
+### Урок №05. TCP и UDP сокеты.
 
-05.01. ETS, DETS.
+05.01. UDP Socket.
 
-05.02. Mnesia.
+05.02. TCP Socket.
 
-05.03. Persistent Term.
+05.03. Сервер с Acceptor Pool.
 
-
-### Урок №06. TCP и UDP сокеты.
-
-06.01. UDP Socket.
-
-06.02. TCP Socket.
-
-06.02. Сервер с Acceptor Pool.
-
-06.03. Бинарные и текстовые протоколы.
+05.04. Бинарные и текстовые протоколы.
 
 
-### Курсовой проект Planning Poker.
+### Урок №06, дополнительный. In-memory Storages.
+
+06.01. ETS, DETS.
+
+06.02. Mnesia.
+
+06.03. Persistent Term.
+
+
