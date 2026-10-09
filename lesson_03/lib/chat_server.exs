@@ -1,6 +1,5 @@
 defmodule ChatServer do
 
-
   defmodule ClientSession do
     use GenServer, restart: :transient
 
@@ -10,7 +9,7 @@ defmodule ChatServer do
     end
 
     def stop(pid) do
-      GenServer.call(pid, :stop)
+      GenServer.cast(pid, :stop)
     end
 
     @impl true
@@ -23,20 +22,21 @@ defmodule ChatServer do
     end
 
     @impl true
-    def handle_call(:stop, _from, state) do
+    def handle_cast(:stop, state) do
       %{client_id: client_id} = state
       IO.puts("Stop ClientSession pid:#{inspect self()}, client_id: #{client_id}")
-      {:stop, :shutdown, state}
+      {:stop, :normal, state}
     end
-
-    # catch all
     
   end
 
   defmodule SessionManager do
     use DynamicSupervisor
 
-    # Module API
+    def start() do
+      start_link(:no_args)
+    end
+
     def start_link(_) do
       Registry.start_link(keys: :unique, name: :session_manager_registry)
       DynamicSupervisor.start_link(__MODULE__, :no_args, name: :session_manager)
@@ -58,16 +58,11 @@ defmodule ChatServer do
       end
     end
 
-    # Callbacks
     @impl true
     def init(:no_args) do
       IO.puts("Start SessionManager")
       DynamicSupervisor.init(strategy: :one_for_one)
     end
-  end
-
-  def start() do
-    SessionManager.start_link(:no_args)
   end
   
 end
