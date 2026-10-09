@@ -4,8 +4,7 @@
 
 1-й курс находится [здесь](https://github.com/yzh44yzh/elixir_course).
 
-Курс доступен в формате видео-лекций и live coding на [YouTube](https://www.youtube.com/playlist?list=PLYuTgpYrBrVKnzanStbVGD09Cdx4YNEpO) и на [RuTube](https://rutube.ru/plst/433906/).
-(TODO это ссылки на 1й курс, нужно сделать другие на 2й курс)
+Курс доступен в формате видео-лекций и live coding на [YouTube](https://www.youtube.com/playlist?list=PLYuTgpYrBrVLwmICu2hSYrOVuPn65y1Wz) и на [RuTube](https://rutube.ru/plst/1095890/).
 
 Поддержать работу над курсом можно на [Boosty](https://boosty.to/yury.zhloba).
 
