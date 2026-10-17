@@ -66,25 +66,27 @@ iex(1)> Application.started_applications()
 Давайте создадим пустое приложение и посмотрим, где находится этот файл, и как он выглядит.
 
 ```
-$ mix new my_cool_service
-$ cd my_cool_service
+$ mix new chat_server
+$ cd chat_server
 $ mix compile
-$ cat _build/dev/lib/my_cool_service/ebin/my_cool_service.app
-{application,my_cool_service,
-             [{applications,[kernel,stdlib,elixir,logger]},
-              {description,"my_cool_service"},
-              {modules,['Elixir.MyCoolApp']},
-              {registered,[]},
-              {vsn,"0.1.0"}]}.
+$ cat _build/dev/lib/chat_server/ebin/chat_server.app
+
+{application, chat_server, [
+  {modules,['Elixir.ChatServer']},
+  {applications,[kernel,stdlib,elixir,logger]},
+  {description,"chat_server"},
+  {registered,[]},
+  {vsn,"0.1.0"}
+]}.
 ```
 
 Файл ресурсов не нужно создавать вручную, он генерируется при сборке. Данные в нем представлены в виде эрланговских (не эликсировских) структур.
 
 Здесь мы видим:
 - имя приложения;
+- список модулей, входящих в состав приложения;
 - зависимость от других приложений;
 - человекочитаемое описание приложения;
-- список модулей, входящих в состав приложения;
 - список глобальных имен, под которыми регистрируются процессы;
 - версия приложения.
 
@@ -95,14 +97,14 @@ $ cat _build/dev/lib/my_cool_service/ebin/my_cool_service.app
 В нашем пустом проекте mix.exs выглядит так:
 
 ```
-defmodule MyCoolApp.MixProject do
+defmodule ChatServer.MixProject do
   use Mix.Project
 
   def project do
     [
       app: :my_cool_service,
       version: "0.1.0",
-      elixir: "~> 1.11",
+      elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -123,7 +125,7 @@ end
 
 Отсюда берутся имя и версия приложения, а так же список других приложений, от которых зависит наше. Здесь указан только `:logger`. Остальные зависимости, `:elixir`, `:strlib`, `:kernel` подключаются неявно. 
 
-Также mix неявно считает, что точкой запуска приложения является модуль `MyCoolApp`. Это можно переопределить, указав ключ `:mod`:
+Также mix неявно считает, что точкой запуска приложения является модуль `ChatServer`. Это можно переопределить, указав ключ `:mod`:
 
 ```
 def application do
@@ -141,7 +143,7 @@ def application do
   [
     extra_applications: [:logger],
     mod: {MyMod, [some_args]},
-    registered: [:agent_a, :agent_b, PathFinder]
+    registered: [:name_1, :name_2]
   ]
 end
 ```
@@ -152,20 +154,11 @@ end
 По умолчанию mix генерирует точку входа в приложение как модуль с именем, совпадающим с именем приложения:
 
 ```
-defmodule MyCoolApp do
+defmodule ChatServer do
   @moduledoc """
-  Documentation for `MyCoolApp`.
+  Documentation for `ChatServer`.
   """
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> MyCoolApp.hello()
-      :world
-
-  """
   def hello do
     :world
   end
@@ -175,13 +168,13 @@ end
 Однако этот модуль должен реализовать `application behaviour`, который включает один обязательный обработчик: `start/2` и несколько необязательных (`pre_stop/1`, `stop/1` и др).
 
 ```
-defmodule MyCoolApp do
+defmodule ChatServer do
   use Application
   
   @impl true
   def start(_start_type, _args) do
-    children = []
-    Supervisor.start_link(children, strategy: :one_for_one) 
+    child_specs = []
+    Supervisor.start_link(child_specs, strategy: :one_for_one) 
   end
 end
 ```
@@ -193,30 +186,7 @@ $ mix compile
 $ iex -S mix
 iex(1)> Application.started_applications()
 [
-  {:my_cool_service, 'my_cool_service', '0.1.0'},
-  ...
-]
-```
-
-При желании приложение можно запустить явно:
-
-```
-$ iex -S mix run --no-start
-iex(1)> Application.started_applications()
-[
-  {:mix, 'mix', '1.11.3'},
-  {:logger, 'logger', '1.11.3'},
-  {:iex, 'iex', '1.11.3'},
-  {:elixir, 'elixir', '1.11.3'},
-  {:compiler, 'ERTS  CXC 138 10', '7.6.3'},
-  {:stdlib, 'ERTS  CXC 138 10', '3.13.2'},
-  {:kernel, 'ERTS  CXC 138 10', '7.1'}
-]
-iex(2)> Application.start(:my_cool_service)
-:ok
-iex(3)> Application.started_applications()
-[
-  {:my_cool_service, 'my_cool_service', '0.1.0'},
+  {:chat_server, ~c"chat_server", ~c"0.1.0"},
   ...
 ]
 ```
@@ -224,18 +194,20 @@ iex(3)> Application.started_applications()
 
 ### start/2
 
-Обработчик `start/2` принимает 2 аргумента: тип запуска приложения и произвольные данные из mix.exs, если они есть:
+Функция `start/2` принимает 2 аргумента: тип запуска приложения и произвольные данные из mix.exs, если они есть:
 
 ```
-my_cool_service.ex:
-  def start(_start_type, some_args) do
+chat_server.ex:
+
+  def start(_start_type, args) do
   ...
   end
 
 mix:exs:
+
   def application do
     [
-      mod: {MyCoolApp, [some_args]},
+      mod: {ChatServer, [42]},
       ...
     ]
   end
@@ -243,23 +215,25 @@ mix:exs:
 
 Тип запуска касается распределенных приложений, которые запускаются на нескольких узлах в кластере. Мы сейчас не будем рассматривать эту тему.
 
-Обработчик должен запустить дерево супервизоров и вернуть pid корневого супервизора.
+Функция `start/2` должена запустить дерево супервизоров и вернуть pid корневого супервизора.
 
 ```
-  def start(_start_type, _args) do
-    children = []
-    Supervisor.start_link(children, strategy: :one_for_one) 
+  @impl true
+  def start(_start_type, args) do
+    IO.puts("ChatServer.start args: #{inspect(args)}")
+    child_specs = []
+    Supervisor.start_link(child_specs, strategy: :one_for_one) 
   end
 ```
 
 
 ### stop/1
 
-Обработчик `stop/1` используется редко. Реализация по умолчанию ничего не делает, а просто возвращает `:ok`. 
+Функция `stop/1` используется редко. Реализация по умолчанию ничего не делает, а просто возвращает `:ok`. 
 
-Идея обработчика в том, что если в `start` выполнялись какие-то действия по инициализации, которые нужно отменить, то их нужно отменять в `stop`.
+Идея функции в том, что если в `start` выполнялись какие-то действия по инициализации, которые нужно отменить, то их нужно отменять в `stop`.
 
-Есть еще обработчик `pre_stop/1`, который вызывается до остановки дерева супервизоров, в отличие от `stop`, который вызывается после остановки.
+Есть еще функция `pre_stop/1`, которая вызывается до остановки дерева супервизоров, в отличие от `stop`, которая вызывается после остановки.
 
 
 
