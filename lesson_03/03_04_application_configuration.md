@@ -4,20 +4,20 @@
 
 ```
 $ iex -S mix
-iex(1)> Application.get_all_env(:my_cool_app)
+iex(1)> Application.get_all_env(:chat_server)
 []
-iex(2)> Application.put_env(:my_cool_app, :param1, 42)
+iex(2)> Application.put_env(:chat_server, :param1, 42)
 :ok
-iex(4)> Application.put_env(:my_cool_app, :param2, :some_val)
+iex(4)> Application.put_env(:chat_server, :param2, :some_val)
 :ok
-iex(5)> Application.get_all_env(:my_cool_app)
+iex(5)> Application.get_all_env(:chat_server)
 [param1: 42, param2: :some_val]
 
-iex(7)> Application.get_env(:my_cool_app, :param1)
+iex(7)> Application.get_env(:chat_server, :param1)
 42
-iex(8)> Application.fetch_env(:my_cool_app, :param1)
+iex(8)> Application.fetch_env(:chat_server, :param1)
 {:ok, 42}
-iex(9)> Application.fetch_env(:my_cool_app, :param3)
+iex(9)> Application.fetch_env(:chat_server, :param3)
 :error
 ```
 
@@ -38,7 +38,7 @@ end
 
 ```
 $ iex -S mix
-iex(1)> Application.get_all_env(:my_cool_app)
+iex(1)> Application.get_all_env(:chat_server)
 [param1: 42, param2: "hello"]
 ```
 
@@ -47,7 +47,7 @@ iex(1)> Application.get_all_env(:my_cool_app)
 ```
 import Config
 
-config :my_cool_app,
+config :chat_server,
   param1: 42,
   param2: "hello",
   param3: true
@@ -60,7 +60,10 @@ iex(1)> Application.get_all_env(:my_cool_service)
 [param1: 42, param3: true, param2: "hello"]
 ```
 
-Давайте запустим в нашем приложении PathFinder и ShardingAgent, а нужные для них настройки вынесем в config.exs.
+Давайте запустим в нашем приложении SessionManager и ClientSession, 
+
+TODO -- придумать настройки
+а нужные для них настройки вынесем в config.exs.
 
 Настройки:
 
