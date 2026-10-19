@@ -3,22 +3,25 @@
 Каждое приложение имеет свои собственные настройки и АПИ для доступа к ним.
 
 ```
+$ cd chat_server
 $ iex -S mix
-iex(1)> Application.get_all_env(:chat_server)
+> Application.get_all_env(:chat_server)
 []
-iex(2)> Application.put_env(:chat_server, :param1, 42)
+> Application.put_env(:chat_server, :param1, 42)
 :ok
-iex(4)> Application.put_env(:chat_server, :param2, :some_val)
+> Application.put_env(:chat_server, :param2, :some_val)
 :ok
-iex(5)> Application.get_all_env(:chat_server)
+> Application.get_all_env(:chat_server)
 [param1: 42, param2: :some_val]
 
-iex(7)> Application.get_env(:chat_server, :param1)
+> Application.get_env(:chat_server, :param1)
 42
-iex(8)> Application.fetch_env(:chat_server, :param1)
+> Application.fetch_env(:chat_server, :param1)
 {:ok, 42}
-iex(9)> Application.fetch_env(:chat_server, :param3)
+> Application.fetch_env(:chat_server, :param3)
 :error
+> Application.get_env(:chat_server, :param3)
+nil
 ```
 
 Настройки хранятся в application environment, это быстрое in-memory key-value хранилище. Оно находится в глобальной области видимости, и к нему можно обращаться из любого места в коде.
@@ -56,7 +59,7 @@ config :chat_server,
 Настройки в этом файле переопределяют настройки в mix.exs:
 
 ```
-iex(1)> Application.get_all_env(:my_cool_service)
+iex(1)> Application.get_all_env(:chat_server)
 [param1: 42, param3: true, param2: "hello"]
 ```
 
