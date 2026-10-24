@@ -16,6 +16,7 @@ defmodule ChatServer.MixProject do
     [
       extra_applications: [:logger],
       mod: {ChatServer, [:hello, :world]},
+      registered: [:session_manager],
       env: [param1: 42, param2: "hello"]
     ]
   end

@@ -32,6 +32,8 @@ nil
 def application do
   [
     extra_applications: [:logger],
+    mod: {ChatServer, [:hello, :world]},
+    registered: [:session_manager],
     env: [param1: 42, param2: "hello"]
   ]
 end
@@ -63,76 +65,65 @@ iex(1)> Application.get_all_env(:chat_server)
 [param1: 42, param3: true, param2: "hello"]
 ```
 
-Давайте запустим в нашем приложении SessionManager и ClientSession, 
-
-TODO -- придумать настройки
-а нужные для них настройки вынесем в config.exs.
-
-Настройки:
+Давайте запустим в нашем приложении SessionManager и ClientSession. И добавим полезную настройку `connection_heartbeat`, которая будет задавать интервал запуска heartbeat -- проверки, что соединение активно.
 
 ```
-config :my_cool_service,
-  data_file: "cities.csv",
-  sharding: %{
-    agent_a: [
-      { 0, 11, "Node-1"},
-      {12, 23, "Node-2"},
-      {24, 35, "Node-3"},
-      {36, 47, "Node-4"}
-    ],
-    agent_b: [
-      { 0,  7, "Node-1"},
-      { 8, 15, "Node-2"},
-      {16, 23, "Node-3"},
-      {24, 31, "Node-4"}
+config :chat_server,
+  connection_heartbeat: 2_000
+```
+
+Запустим `SessionManager` в корневом супервизоре `ChatServer`:
+
+```
+    child_specs = [
+      SessionManager
     ]
-  }
+    Supervisor.start_link(child_specs, strategy: :one_for_one) 
 ```
 
-TODO: mix env, dev/test/prod config
-
-Запуск процессов:
-
+И при создании `ClientSession` будем передавать ему настройку `connection_heartbeat`:
 ```
-  @impl true
-  def start(_start_type, _args) do
-    data_file = Application.get_env(:my_cool_service, :data_file)
-    data_file = Application.app_dir(:my_cool_service, "priv") |> Path.join(data_file)
+  def start_session(client_id) do
+    options = %{
+      heartbeat: Application.get_env(:chat_server, :connection_heartbeat)
+    }
+    args = {client_id, @registry, options}
+    child_spec = {ClientSession, args}
+    DynamicSupervisor.start_child(@sup_name, child_spec)
+  end
+```
 
-    sharding = Application.get_env(:my_cool_service, :sharding)
-
-    children = [
-      {MyCoolApp.PathFinder, [data_file]},
-      %{
-        id: :agent_a,
-        start: {MyCoolApp.ShardingAgent, :start_link, [{:agent_a, sharding.agent_a}]}
-      },
-      %{
-        id: :agent_b,
-        start: {MyCoolApp.ShardingAgent, :start_link, [{:agent_b, sharding.agent_b}]}
-      }
-    ]
-    Supervisor.start_link(children, strategy: :one_for_one)
+А в `ClientSession` будем принимать эту настройку:
+```
+  def init({client_id, options}) do
+    state = %{
+      client_id: client_id,
+      heartbeat: Map.get(options, :heartbeat)
+    }
+    IO.puts("Start ClientSession pid:#{inspect self()}, state: #{inspect state}")
+    {:ok, state}
   end
 ```
 
 Проверяем, как это работает:
 
 ```
-$ iex -S mix
-Compiling 3 files (.ex)
-Generated my_cool_service app
+$ iex -S mix  
+ChatServer.start args: [:hello, :world]
+Start SessionManager
 
-init PathFinder %{data_file: ["/home/y_zhloba/p/elixir_course_junior/lesson_11/my_cool_service/_build/dev/l
-ib/my_cool_service/priv/cities.csv"]}
-init ShardingAgent agent_a [{0, 11, "Node-1"}, {12, 23, "Node-2"}, {24, 35, "Node-3"}, {36, 47, "Node-4
-"}]
-init ShardingAgent agent_b [{0, 7, "Node-1"}, {8, 15, "Node-2"}, {16, 23, "Node-3"}, {24, 31, "Node-4"}
-]
-> MyCoolApp.PathFinder.get_route("Москва", "Казань")
-{:ok, ["Москва", "Архангельск", "Казань"], 3267}
-> MyCoolApp.ShardingAgent.find_node(:agent_a, 8)
-{:ok, "Node-1"}
-> MyCoolApp.ShardingAgent.find_node(:agent_b, 8)
-{:ok, "Node-2"}
+> SessionManager.start_session(1)
+Start ClientSession pid:#PID<0.166.0>, state: %{client_id: 1, heartbeat: 2000}
+{:ok, #PID<0.166.0>}
+
+> SessionManager.start_session(2)
+Start ClientSession pid:#PID<0.167.0>, state: %{client_id: 2, heartbeat: 2000}
+{:ok, #PID<0.167.0>}
+
+> SessionManager.stop_session(1)
+:ok
+Stop ClientSession pid:#PID<0.166.0>, client_id: 1
+
+> SessionManager.stop_session(1)
+{:error, :not_found}
 ```

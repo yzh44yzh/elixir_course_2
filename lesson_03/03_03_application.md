@@ -102,9 +102,9 @@ defmodule ChatServer.MixProject do
 
   def project do
     [
-      app: :my_cool_service,
+      app: :chat_server,
       version: "0.1.0",
-      elixir: "~> 1.20",
+      elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -131,7 +131,7 @@ end
 def application do
   [
     extra_applications: [:logger],
-    mod: {MyMod, [some_args]}
+    mod: {ChatServer, [:hello, :world]}
   ]
 end
 ```
@@ -142,8 +142,8 @@ end
 def application do
   [
     extra_applications: [:logger],
-    mod: {MyMod, [some_args]},
-    registered: [:name_1, :name_2]
+    mod: {ChatServer, [:hello, :world]},
+    registered: [:session_manager]
   ]
 end
 ```
