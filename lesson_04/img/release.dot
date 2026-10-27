@@ -28,7 +28,7 @@ digraph GS {
             crypto
 
             "User Apps"
-            my_cool_app
+            chat_server
 
             Dependencies
             elixir
@@ -63,7 +63,7 @@ digraph GS {
     "OTP Apps" -> inets
     "OTP Apps" -> crypto
 
-    "User Apps" -> my_cool_app
+    "User Apps" -> chat_server
 
     Dependencies -> elixir
     Dependencies -> logger
