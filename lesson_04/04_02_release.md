@@ -38,126 +38,107 @@
 ![Federation](./img/federation.png)
 
 
-## Практика
+## Сборка и запуск
 
-- собирать релиз для chat_server
-- показать, из чего он состоит
-- скрипт запуска, что он умеет
-- запустить, пингануть, подключиться remote_console, остановить.
-- compile-time and run-time configuration, переменные окружения
-
-
-### разница между mix run и bin/chat_server start
-
-Mix itself loads/starts things a little differently than OTP releases
-
-Mix:
-- compile sources
-- starts BEAM
-- loads and starts the :kernel, :stdlib, :compiler, :elixir, and :mix applications
-- evaluates the config.exs file 
-  in order to ensure the application configuration is set up before your application starts.
-- uses the project definition to load and start applications as needed. 
-
-OTP release:
-- Mix is not included
-- boot script instructs the runtime exactly how to boot everything. 
-- custom instruction to ensure that configuration providers, like Mix.Config have a chance to run before your application is started
-
-As a result, there are some small differences in how your application will run under Mix and under a release, but for the most part, there should be no noticeable differences.
-
-Boot script:
-- consists of erlang terms
-- operates at a very low level, instructing the runtime what modules to load, checkpointing major events, using apply instructions to load and start applications, and more
-The script containing instructions for the VM on how to boot. 
-The source form has the .script extension, and the “compiled” or binary form of the script has the .boot extension. 
-
-Mix -- специфика Эликсир. Boot script -- часть инфраструктуры Эрланг.
-
-
-### Что включает в себя релиз
-
-An OTP release at its most basic level describes the applications and their versions, that it needs to run. The file in which this is described is stored with a .rel extension, and looks like so:
+Давайте соберём релиз `chat_server`: 
 
 ```
-{release,{"test","0.1.0"},
-         {erts,"8.2"},
-         [{kernel,"5.1.1"},
-          {stdlib,"3.2"},
-          {poison,"3.1.0"},
-          {logger,"1.4.1"},
-          {compiler,"7.0.3"},
-          {elixir,"1.4.1"},
-          {test,"0.1.0"},
-          {iex,"1.4.1"},
-          {sasl,"3.0.2"}]}.
+$ mix release
+* assembling chat_server-0.1.0 on MIX_ENV=dev
+* skipping runtime configuration (config/runtime.exs not found)
+
+Release created at _build/dev/rel/chat_server
+...
 ```
 
-- release name and version. 
-- version of ERTS (the Erlang Runtime System) which the release is targeting. 
-- list of the applications and versions of those applications which are required to run the release.
+И посмотрим из чего он состоит:
 
-This release descriptor (as I have come to call it), is also what is used to generate the boot script.
-convert this high level description into all of the required low-level instructions needed to boot the described release.
+```
+$ tree -L 2 _build/dev/rel/chat_server
+_build/dev/rel/chat_server
+├── bin
+│   ├── chat_server
+│   └── chat_server.bat
+├── erts-17.0.2
+│   └── bin
+├── lib
+│   ├── chat_server-0.1.0
+│   ├── compiler-10.0.1
+│   ├── elixir-1.20.1
+│   ├── iex-1.20.1
+│   ├── kernel-11.0.2
+│   ├── logger-1.20.1
+│   ├── sasl-4.4
+│   └── stdlib-8.0.1
+└── releases
+    ├── 0.1.0
+    ├── COOKIE
+    └── start_erl.data
+```
 
-Given the release descriptor, and the boot script, a release is packaged by gathering 
-- all of the compiled .beam files required by the applications contained in the release, 
-- the target ERTS (if included), 
-- and any supporting files - such as config.exs, sys.config, vm.args, 
-- as well as the shell script used to set up the environment and run the release 
-into a gzipped tarball for easy deployment.
+`bin` -- исполняемые файлы для запуска приложения.
+`erts` -- erlang runtime system.
+`lib` -- байт-код приложения и всех зависимостей.
+`release` -- служебные файлы для загрузки, конфигурации и обновления.
 
-Overlay:
-When a release is constructed, and prior to it being archived, additional files or directories may be desired in the release, and overlays are used to accomplish that. They consist of a few primitive operations: mkdir, copy, link, and template, and allow you to do one of those four operations to extend the contents of the release as desired.
+Посмотрим, как запустить приложение:
+```
+$ cd _build/dev/rel/chat_server/bin
+$ ./chat_server
+Usage: chat_server COMMAND [ARGS]
 
+The known commands are:
 
-### Прочее
+    start          Starts the system
+    start_iex      Starts the system with IEx attached
+    daemon         Starts the system as a daemon
+    daemon_iex     Starts the system as a daemon with IEx attached
+    eval "EXPR"    Executes the given expression on a new, non-booted system
+    rpc "EXPR"     Executes the given expression remotely on the running system
+    remote         Connects to the running system via a remote shell
+    restart        Restarts the running system via a remote command
+    stop           Stops the running system via a remote command
+    pid            Prints the operating system PID of the running system via a remote command
+    version        Prints the release name and version to be booted
+```
 
-You can embed the minimum erlang runtime into release. Then you don't need Elixir and Erlang installed on host machine. Whatever is required to run the system will be part of your release package.
+В кубе можно запускать прямо в консоли:
+```
+$ ./chat_server start      
+ChatServer.start [:hello, :world]
+Start SessionManager
+```
 
-**Release handling** is the way of systematic online system upgrades (and downgrades).
+Но если у нас виртуалка без куба, то нужно запускать как фоновый процесс:
+```
+$ ./chat_server daemon
+```
 
-- compiled OTP applications;
-- erlang runtime binaries;
-- boot script describing which OTP applications need to be started;
-- vm.args -- arguments that will be passed to the virtual machine;
-- sys.config -- configuration file;
-- helper script to start, stop, and interact with the system.
+Подключиться iex-консолью к работающему узлу можно так:
+```
+$ ./chat_server remote
+Erlang/OTP 29 [erts-17.0.2] [source] [64-bit] [smp:20:20] [ds:20:20:10] [async-threads:1] [jit:ns]
 
-_build/prod/rel/proj_name/releases/0.1.0/proj_name.tar.gz
-compressed version of the entire release
-copy this file to host machine, unpack, and use bin/proj_name start
+Interactive Elixir (1.20.1) - press Ctrl+C to exit (type h() ENTER for help)
+iex(chat_server@yury-zhloba-desktop)1> Application.started_applications()
+[
+  {:iex, ~c"iex", ~c"1.20.1"},
+  {:chat_server, ~c"chat_server", ~c"0.1.0"},
+  {:logger, ~c"logger", ~c"1.20.1"},
+  {:sasl, ~c"SASL  CXC 138 11", ~c"4.4"},
+  {:elixir, ~c"elixir", ~c"1.20.1"},
+  {:compiler, ~c"ERTS  CXC 138 10", ~c"10.0.1"},
+  {:stdlib, ~c"ERTS  CXC 138 10", ~c"8.0.1"},
+  {:kernel, ~c"ERTS  CXC 138 10", ~c"11.0.2"}
+]
+```
 
-This file plays important role in live upgrade.
-bin/proj_name upgrade "0.2.0"
+Ну и остановить фоновый процесс:
+```
+$ ./chat_server stop
+```
 
-Boot file описывает, какие приложения и модули загружать, и запускать, и в какой последовательности.
-Создается текстовый, потом компилируется в бинарник.
-
-Sample:
-releases/18/start_sasl.script
-releases/18/start_sasl.boot
-
-Вообще тут 4 boot файла:
-- start_clean.boot -- запустить только kernel и stdlib
-- start_sasl.boot -- запустить kernel, stdlib и sasl
-- no_dot_erlang.boot -- не выполнять инструкции в файле .erlang при запуске ноды
-- start.boot -- копия одного из 3х выше, выполняется по умолчанию.
-
-As you can see this script operates at a very low level, instructing the runtime what modules to load, checkpointing major events, using apply instructions to load and start applications, and more 
-
-In an OTP release, this script is actually converted to a binary form, which is stored with a .boot extension, but all this file is, is the result of calling :erlang.term_to_binary/1 on the data structure in the .script file. If you ever need to see exactly what is in the .boot, just run :erlang.binary_to_term/1 on the contents to see the data structure itself.
-
-The main tool to interact with release is the shell script
-_build/prod/rel/proj_name/bin/proj_name
-
-- start the system with iex shell in foreground
-- start the system as a background process
-- attach a remote shell to running system
-- stop the system
-
-
-## Configuration
+## Как работает конфигурация
 
 BEAM на старте читает все настройки из sys.config
 В принципе, можно было бы этим и пользоваться. Но sys.config неудобен тем, что в конфигурация в нем описана в erlang term. 
