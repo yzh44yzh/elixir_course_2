@@ -140,14 +140,126 @@ $ ./chat_server stop
 
 ## Как работает конфигурация
 
-Whenever you invoke a mix command, Mix loads the configuration in config/config.exs, if said file exists. 
-It is common for the config/config.exs file itself to import other configuration based on the current MIX_ENV, 
-such as config/dev.exs, config/test.exs, and config/prod.exs, by calling Config.import_config/1:
+Конфигурация работает немного по-разному локально, на машине разработчика, и в релизе развёрнутом на проде.
+
+При локальном запуске `mix` ищет и выполняет файл `config/config.exs`:
 
 ```
 import Config
+
+config :chat_server,
+  connection_heartbeat: 2_000,
+  param_a: "a",
+  param_b: "b"
+```
+
+Импорт модуля `Config` загружает макросы `config/2`, `config/3`, `config_env/0` и другие. Этими макросами задаётся конфигурация для каждого приложения, в том числе для библиотек.
+
+mix поддерживает несколько окружений: dev, test, prod. Часто бывает необходимо иметь разную конфигурацию для разных окружений. Например, разный коннект к БД для dev и test.
+
+Для этого создают отдельные файлы `config/dev.exs`, `config/test.exs`, `config/prod.exs`. И подключают их в `config/config.exs` с помощью `import_config`:
+
+```
 import_config "#{config_env()}.exs"
 ```
+
+Запустим `chat_server` с разными окружениями:
+
+```
+$ iex -S mix 
+Start ChatServer
+Start SessionManager
+iex(1)> Application.get_all_env(:chat_server)
+[connection_heartbeat: 2000, param_b: "b-dev", param_a: "a-dev"]
+
+$ MIX_ENV=test iex -S mix
+Start ChatServer
+Start SessionManager
+iex(1)> Application.get_all_env(:chat_server)
+[connection_heartbeat: 2000, param_b: "b-test", param_a: "a-test"]
+```
+
+При сборке релиза вся эта конфигурация упаковывается в файл `sys.config`: 
+
+```
+MIX_ENV=prod mix release
+```
+
+```
+$ cat _build/dev/prod/chat_server/releases/0.1.0/sys.config
+%% coding: utf-8
+%% RUNTIME_CONFIG=false
+[
+  {chat_server,[
+    {connection_heartbeat,2000},
+    {param_a,<<"a-prod">>},
+    {param_b,<<"b-prod">>}
+  ]},
+  {elixir,...
+```
+
+Однако, мы не можем держать конфигурацию для прода прямо в репозитории проекта. К тому же, нужна разная конфигурация для разных машин на проде. Поэтому нужен способ переопределить конфигурацию для конкретной машины.
+
+TODO runtime.exs
+
+
+
+Собирать на машине с той же архитектурой и ОС, что и прод:
+```
+MIX_ENV=prod mix release
+```
+Обычно собирают в CI в докер-контейнере.
+
+```
+$ cat _build/dev/rel/chat_server/releases/0.1.0/sys.config                                          git:main * 
+%% coding: utf-8
+%% RUNTIME_CONFIG=false
+[
+  {chat_server,[
+    {connection_heartbeat,2000},
+    {param_a,<<"a-prod">>},
+    {param_b,<<"b-prod">>}
+  ]},
+  {elixir,...
+```
+
+```
+$ iex -S mix 
+Start ChatServer
+Start SessionManager
+iex(1)> Application.get_all_env(:chat_server)
+[connection_heartbeat: 2000, param_b: "b-dev", param_a: "a-default"]
+
+$ MIX_ENV=test iex -S mix
+Start ChatServer
+Start SessionManager
+iex(1)> Application.get_all_env(:chat_server)
+[param_b: "b-test", connection_heartbeat: 2000, param_a: "a-default"]
+
+$ MIX_ENV=test PARAM_A=a_from_env iex -S mix
+Start ChatServer
+Start SessionManager
+iex(1)> Application.get_all_env(:chat_server)
+[connection_heartbeat: 2000, param_b: "b-test", param_a: "a_from_env"]
+
+$ cat _build/dev/rel/chat_server/releases/0.1.0/runtime.exs                                         git:main * 
+import Config
+
+config :chat_server,
+  param_a: System.get_env("PARAM_A", "a-default")
+```
+
+```
+$ _build/dev/rel/chat_server/bin/chat_server start_iex
+Start ChatServer
+Start SessionManager
+iex(chat_server@yury-zhloba-desktop)1> Application.get_all_env(:chat_server)
+[param_a: "a-default", param_b: "a-dev", connection_heartbeat: 2000]
+```
+
+
+
+
 
 To enable runtime configuration in your release, all you need to do is to create a file named config/runtime.exs.
 This file will be executed whenever your Mix project or your release starts.
