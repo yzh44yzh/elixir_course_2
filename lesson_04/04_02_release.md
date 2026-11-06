@@ -200,28 +200,20 @@ $ cat _build/dev/prod/chat_server/releases/0.1.0/sys.config
 
 Однако, мы не можем держать конфигурацию для прода прямо в репозитории проекта. К тому же, нужна разная конфигурация для разных машин на проде. Поэтому нужен способ переопределить конфигурацию для конкретной машины.
 
-TODO runtime.exs
+Поэтому mix ищет и выполняет ещё один файл -- `config/runtime.exs`. Этот файл упаковывается в релиз отдельно. И его можно заменить на каждой машине, где разворачивается релиз. 
 
-
-
-Собирать на машине с той же архитектурой и ОС, что и прод:
-```
-MIX_ENV=prod mix release
-```
-Обычно собирают в CI в докер-контейнере.
+Однако при сложившейся традиции разворачивания сервисов в k8s и конфигурирования их через переменные окружения, файл `runtime.exs` не заменяют, а внутри него загружают значения из переменных окружения:
 
 ```
-$ cat _build/dev/rel/chat_server/releases/0.1.0/sys.config                                          git:main * 
-%% coding: utf-8
-%% RUNTIME_CONFIG=false
-[
-  {chat_server,[
-    {connection_heartbeat,2000},
-    {param_a,<<"a-prod">>},
-    {param_b,<<"b-prod">>}
-  ]},
-  {elixir,...
+import Config
+
+config :chat_server,
+  param_a: System.get_env("PARAM_A", "a-default")
 ```
+
+Важно понять, что `System.get_env` во всех `config/*.exs` кроме `runtime.exs` выполяется при сборке релиза и испльзует окружение той машины, где происходит сборка (и обычно в этом нет смысла, кроме каких-то экзотических случаев). А `System.get_env` в `runtime.exs` выполянется каждый раз при запуске сервиса на продовой машине и в окружении продовой машины (ну или в окружении пода k8s).
+
+При локальном запуске `runtime.exs` тоже выполняется.
 
 ```
 $ iex -S mix 
@@ -234,47 +226,32 @@ $ MIX_ENV=test iex -S mix
 Start ChatServer
 Start SessionManager
 iex(1)> Application.get_all_env(:chat_server)
-[param_b: "b-test", connection_heartbeat: 2000, param_a: "a-default"]
+[connection_heartbeat: 2000, param_b: "b-test", param_a: "a-default"]
 
 $ MIX_ENV=test PARAM_A=a_from_env iex -S mix
 Start ChatServer
 Start SessionManager
 iex(1)> Application.get_all_env(:chat_server)
 [connection_heartbeat: 2000, param_b: "b-test", param_a: "a_from_env"]
-
-$ cat _build/dev/rel/chat_server/releases/0.1.0/runtime.exs                                         git:main * 
-import Config
-
-config :chat_server,
-  param_a: System.get_env("PARAM_A", "a-default")
 ```
 
+Ну и при запуске релиза тоже выполнятся:
+
 ```
-$ _build/dev/rel/chat_server/bin/chat_server start_iex
+MIX_ENV=prod mix release
+
+$ _build/prod/rel/chat_server/bin/chat_server start_iex
 Start ChatServer
 Start SessionManager
 iex(chat_server@yury-zhloba-desktop)1> Application.get_all_env(:chat_server)
-[param_a: "a-default", param_b: "a-dev", connection_heartbeat: 2000]
+[param_a: "a-default", param_b: "a-prod", connection_heartbeat: 2000]
 ```
 
+#TODO vm.args
 
+Собирать на машине с той же архитектурой и ОС, что и прод.
 
-
-
-To enable runtime configuration in your release, all you need to do is to create a file named config/runtime.exs.
-This file will be executed whenever your Mix project or your release starts.
-
-Your config/runtime.exs file needs to follow three important rules:
-It MUST import Config at the top instead of the deprecated use Mix.Config
-It MUST NOT import any other configuration file via import_config
-It MUST NOT access Mix in any way, as Mix is a build tool and it is not available inside releases
-
-If a config/runtime.exs exists, it will be copied to your release and executed early in the boot process, when only Elixir and Erlang's main applications have been started.
-
-
-config/config.exs (and config/prod.exs) - provides build-time application configuration, which are executed when the release is assembled
-
-config/runtime.exs - provides runtime application configuration. It is executed every time your Mix project or your release boots and is further extensible via config providers. If you want to detect you are inside a release, you can check for release specific environment variables, such as RELEASE_NODE or RELEASE_MODE
+Обычно собирают в CI в докер-контейнере.
 
 rel/vm.args.eex and rel/remote.vm.args.eex - template files that are copied into every release and provides static configuration of the Erlang Virtual Machine and other runtime flags. vm.args runs on start, daemon, and eval commands. remote.vm.args configures the VM for remote and rpc commands
 
