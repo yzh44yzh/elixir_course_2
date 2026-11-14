@@ -102,14 +102,14 @@ The known commands are:
     version        Prints the release name and version to be booted
 ```
 
-В кубе можно запускать прямо в консоли:
+В k8s можно запускать прямо в консоли:
 ```
 $ ./chat_server start      
 ChatServer.start [:hello, :world]
 Start SessionManager
 ```
 
-Но если у нас виртуалка без куба, то нужно запускать как фоновый процесс:
+Но если у нас виртуалка без k8s, то нужно запускать как фоновый процесс:
 ```
 $ ./chat_server daemon
 ```
@@ -247,82 +247,43 @@ iex(chat_server@yury-zhloba-desktop)1> Application.get_all_env(:chat_server)
 [param_a: "a-default", param_b: "a-prod", connection_heartbeat: 2000]
 ```
 
-#TODO vm.args
+## Настройки виртуальной машины.
 
-Собирать на машине с той же архитектурой и ОС, что и прод.
+Кроме конфигурации приложения есть ещё настройки виртуальной машины. Для этого есть отдельные файлы в составе релиза `vm.args` и `env.sh`. Можно создать в своём проекте шаблоны для генерации этих файлов:
 
-Обычно собирают в CI в докер-контейнере.
+```
+chat_server $ mix release.init
+* creating rel/vm.args.eex
+* creating rel/remote.vm.args.eex
+* creating rel/env.sh.eex
+* creating rel/env.bat.eex
+```
 
-rel/vm.args.eex and rel/remote.vm.args.eex - template files that are copied into every release and provides static configuration of the Erlang Virtual Machine and other runtime flags. vm.args runs on start, daemon, and eval commands. remote.vm.args configures the VM for remote and rpc commands
+В файле `vm.args` указываются флаги для виртуальной машины. Например:
+```
++P 262144 # лимит на количество процессов
++Q 65536 # лимит на количество портов
++A 4 # размер асинхронного пула
+```
 
-rel/env.sh.eex and rel/env.bat.eex - template files that are copied into every release and are executed on every command to set up environment variables, including specific ones to the VM, and the general environment
-
-
-
-### Emulator flags
-
-vm.args
-
-Deal with memory management, multicore architectures, ports and sockets, low-level tracing, or other internal optimizations.
-
-also:
-
-+Bc -- disables the shell break handler, so when you press the sequence Ctrl-c a,
-instead of terminating the virtual machine you terminate just the shell process and restart it
-
-+e Num -- sets the maximum number of ETS tables, which defaults to 2,053
-
-+P Num -- system limit on the maximum number of processes allowed to exist simultaneously.
-default is 262,144, range from 1,024 to 134,217,727.
-
-+Q Num -- maximum number of ports allowed in the system,
-default to 65,536. range is 1,024 to 134,217,727.
-
-+t Num -- maximum number of allowed atoms, set by default to 1,048,576.
+- настройки шедулеров
+- настройки для управления памятью
+- настройки IO
+- и куча других
 
 
-## Доставка (Deployment)
+## Горячее обновление
 
-A **deployment** is a way of getting a release into an environment where it can be used.
+На момент создания виртуальной машины в 80-х - 90-х годах горячее обновление кода было важной фичей. Причём речь идёт не просто об обновлении кода одного или нескольких модулей, а о горячем переключении на следующую версию приложения.
 
-Машина, на которой происходит сборка релиза должна соответствовать машине, где система будет запускаться и работать:
-- OS, 
-- kernel version, 
-- architecture, 
-- and system libraries. 
+Для этого в релизе предусмотрены механизмы загрузки кода, переключения процессов на новый код, миграция состояния процессов на новые структуры данных, изменения в дереве супервизоров. Миграцию на новую версию нужно реализовать и протестировать. Более того, ещё нужно реализовать и протестировать откат на старую версию.
 
-Теоретически релиз может быть в некоторой мере кросс-платформенным: BEAM-файлы, конфигурация и bash-скрипты.
-Но если в него включена ERTS, то она привязана к конкретной ОС и архитектуре, и зависит от системных библиотек.
-(А если ERTS не включена, то подразумевается, что на целевой машине она уже есть, и в нужной версии).
-Кроме того, в зависимостях могут быть библиотеки, включающие C-код. 
+Это слишком сложно, и этим теперь никто не пользуется. Проще просто перезапустить приложение. А отсутствие downtime, если это нужно, обеспечивается на другом уровне -- запуском нескольких узлов и балансировкой нагрузки между ними. 
 
-Можно подготовить соответствующий докер-контейнер, и собирать в нем.
-Или можно собирать в CI на какой-то специально подготовленной для этого машине.
-
-https://hexdocs.pm/distillery/guides/deploying_to_aws.html
-
-## Live upgrade
-
-как это работает
-
-почему оно было нужно в телекоме, и почему оно не нужно сейчас
-
-_build/prod/rel/proj_name/releases/0.1.0/proj_name.tar.gz
-This file plays important role in live upgrade.
-bin/proj_name upgrade "0.2.0"
-
-- migrate state of stateful processes (gen_server.code_change);
-- migrate state of ETS tables;
-- reconfigure supervision tree;
-- restart OTP apps.
-
-Alternative approach: restart nodes in cluster one by one.
+Горячее обновление кода остаётся удобной фичёй для локальной разработки, но не нужно на проде.
 
 
-A **hot upgrade** is a kind of deployment that allows the release of a currently running application
-to be changed while that application continues to run —
-the upgrade happens in place with no user-detectable disruption.
 
-Appup - A file containing Erlang terms which describes with **high-level** instructions how to upgrade and downgrade between the current release and one or more older releases.
 
-Relup - A file containing Erlang terms which describes with **low-level** instructions how to upgrade and downgrade between the current release and one or more older releases.
+
+
